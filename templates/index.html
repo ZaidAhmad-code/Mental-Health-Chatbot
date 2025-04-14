@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mental Health Assistant</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        :root {
+            --primary-dark: #1a1a1a;
+            --secondary-dark: #2d2d2d;
+            --lavender-accent: #967bb6;
+            --text-primary: #e0e0e0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--primary-dark);
+            color: var(--text-primary);
+            margin: 0;
+            height: 110vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 800px;
+            height: 220px;
+            margin: 0 auto;
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        h1 {
+            color: var(--lavender-accent);
+            text-align: center;
+            margin: 20px 0;
+            font-weight: 350;
+            letter-spacing: 1.5px;
+        }
+
+        #chat-log {
+            background-color: var(--secondary-dark);
+            border-radius: 12px;
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #3d3d3d;
+            margin-bottom: 15px;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+            padding: 10px 0;
+            background: var(--primary-dark);
+            position: sticky;
+            bottom: 0;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #3d3d3d;
+            background-color: var(--secondary-dark);
+            color: var(--text-primary);
+            resize: none;
+            font-size: 16px;
+            min-height: 50px;
+            max-height: 150px;
+        }
+
+        #send-button {
+            padding: 15px 30px;
+            background-color: var(--lavender-accent);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            align-self: flex-end;
+        }
+
+        #send-button:hover {
+            background-color: #7c669d;
+            transform: translateY(-1px);
+        }
+
+        .chat-message {
+            margin: 15px 0;
+            padding: 12px 18px;
+            border-radius: 8px;
+            max-width: 80%;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .user-message {
+            background-color: #3d3d3d;
+            margin-left: auto;
+        }
+
+
+        .bot-message {
+            background-color: var(--lavender-accent);
+            color: white;
+            margin-right: auto;
+            line-height: 1.6;
+            text-align: left;
+            white-space: pre-line;
+        }
+
+        .bot-message p {
+            margin: 0.8em 0;
+        }
+
+        .bot-message br {
+            display: block;
+            content: "";
+            margin-bottom: 0.5em;
+        }
+        footer {
+            background: var(--secondary-dark);
+            padding: 15px;
+            text-align: center;
+            margin-top: auto;
+        }
+
+        /* Emergency Button Styles */
+        .emergency-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background-color: #b33a3a;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            font-weight: 500;
+        }
+
+        .emergency-btn:hover {
+            background-color: #9a2e2e;
+            transform: translateY(-2px);
+        }
+
+        .emergency-card {
+            position: fixed;
+            bottom: 90px;
+            right: 30px;
+            background-color: var(--secondary-dark);
+            border-radius: 12px;
+            padding: 20px;
+            width: 250px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        .emergency-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: all;
+        }
+
+        .emergency-card h3 {
+            color: var(--lavender-accent);
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .emergency-card p {
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+
+        .emergency-card a {
+            color: var(--lavender-accent);
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        .emergency-card a:hover {
+            text-decoration: underline;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            #send-button {
+                padding: 15px 20px;
+            }
+
+            .emergency-btn {
+                bottom: 20px;
+                right: 20px;
+                padding: 12px 20px;
+            }
+
+            .emergency-card {
+                bottom: 80px;
+                right: 20px;
+                width: calc(100% - 40px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MENTAL HEALTH ASSISTANT</h1>
+        <div id="chat-log"></div>
+
+        <div class="input-container">
+            <textarea id="user-input" placeholder="Type your message here..." rows="1"></textarea>
+            <button id="send-button">Send</button>
+        </div>
+    </div>
+
+    <button class="emergency-btn">Emergency Contacts</button>
+    <div class="emergency-card">
+        <h3>Immediate Assistance</h3>
+        <p>Email: <a href="mailto:zaidahmad0152@gmail.com">zaidahmad0152@gmail.com</a></p>
+        <p>Phone: <a href="tel:+94762513253">+94 762 513 253</a></p>
+    </div>
+
+    <footer>
+        <div style="color: #666;">
+            &copy; 2024 Zaid Ahmad. All rights reserved.
+        </div>
+    </footer>
+
+    <script>
+    $(document).ready(function() {
+        // Auto-resize textarea
+        function autoResize() {
+            this.style.height = 'auto';
+            this.style.height = this.scrollHeight + 'px';
+        }
+
+        $('#user-input').on('input', autoResize);
+
+        // Format bot response
+        function formatBotResponse(text) {
+            // Convert numbered points to HTML list
+            text = text.replace(/(\d+\.)\s/g, '<br>$1 ');
+            // Convert line breaks to HTML line breaks
+            text = text.replace(/\n/g, '<br>');
+            // Convert double line breaks to paragraphs
+            text = text.replace(/(<br>){2,}/g, '</p><p>');
+            // Wrap in proper HTML structure
+            return `<p>${text}</p>`;
+        }
+
+        // Chat functionality
+        $('#send-button').click(function() {
+            const userQuery = $('#user-input').val().trim();
+            if (!userQuery) return;
+
+            // Add user message
+            $('#chat-log').append(`
+                <div class="chat-message user-message">
+                    ${userQuery}
+                </div>
+            `);
+
+            // Add temporary bot response
+            const tempBotResponse = `<div class="chat-message bot-message">Processing your query...</div>`;
+            $('#chat-log').append(tempBotResponse);
+            $('#chat-log').scrollTop($('#chat-log')[0].scrollHeight);
+
+            // AJAX call
+            $.post('/ask', { query: userQuery }, function(data) {
+                // Remove temporary message
+                $('#chat-log').children().last().remove();
+
+                // Format the response
+                const formattedResponse = formatBotResponse(data.response);
+
+                // Add actual response
+                $('#chat-log').append(`
+                    <div class="chat-message bot-message">
+                        ${formattedResponse}
+                    </div>
+                `);
+                $('#chat-log').scrollTop($('#chat-log')[0].scrollHeight);
+            }).fail(function() {
+                $('#chat-log').children().last().remove();
+                $('#chat-log').append(`
+                    <div class="chat-message bot-message">
+                        Error connecting to the server. Please try again.
+                    </div>
+                `);
+            });
+
+            $('#user-input').val('').height('auto');
+        });
+
+        // Handle Enter key
+        $('#user-input').keypress(function(e) {
+            if (e.which === 13 && !e.shiftKey) {
+                e.preventDefault();
+                $('#send-button').click();
+            }
+        });
+
+        // Emergency Panel Toggle
+        const emergencyBtn = document.querySelector('.emergency-btn');
+        const emergencyCard = document.querySelector('.emergency-card');
+
+        emergencyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            emergencyCard.classList.toggle('visible');
+        });
+
+        // Close card when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!emergencyCard.contains(e.target) && !emergencyBtn.contains(e.target)) {
+                emergencyCard.classList.remove('visible');
+            }
+        });
+    });
+    </script>
+</body>
+</html>
