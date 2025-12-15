@@ -1,0 +1,11 @@
+flask
+langchain
+langchain-community
+langchain-groq
+langchain-google-genai
+langchain-huggingface
+chromadb
+sentence-transformers
+pypdf
+python-dotenv
+google-generativeai
