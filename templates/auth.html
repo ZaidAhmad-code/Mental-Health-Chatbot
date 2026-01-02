@@ -294,6 +294,32 @@
             color: white;
         }
 
+        /* Footer styling for auth page */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: transparent;
+            border: none;
+            padding: 16px 24px;
+            text-align: center;
+            z-index: 0;
+        }
+
+        .footer-content {
+            max-width: 100%;
+            margin: 0 auto;
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+
+        .footer-content p {
+            margin: 4px 0;
+        }
+
         @media (max-width: 480px) {
             .auth-card {
                 padding: 28px 24px;
@@ -301,6 +327,14 @@
 
             .logo h1 {
                 font-size: 24px;
+            }
+
+            .footer {
+                padding: 12px 16px;
+            }
+
+            .footer-content {
+                font-size: 11px;
             }
         }
     </style>
@@ -469,5 +503,15 @@
             }
         }
     </script>
+
+    <!-- ==================== FOOTER ==================== -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2026 Serene Mental Health Chatbot. All rights reserved.</p>
+            <p style="font-size: 12px; margin-top: 8px; opacity: 0.8;">
+                Your mental health matters. We're here to support you. 💚
+            </p>
+        </div>
+    </footer>
 </body>
 </html>

@@ -522,8 +522,8 @@ def get_user_by_id(user_id):
     return None
 
 
-def create_user(username, email, password_hash):
-    """Create a new user with authentication"""
+def create_user(username, email, password):
+    """Create a new user with authentication - password stored in plain text"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
@@ -531,7 +531,7 @@ def create_user(username, email, password_hash):
         cursor.execute('''
             INSERT INTO users (username, email, password_hash)
             VALUES (?, ?, ?)
-        ''', (username, email, password_hash))
+        ''', (username, email, password))  # Store password in plain text
         conn.commit()
         user_id = cursor.lastrowid
         conn.close()
@@ -560,14 +560,14 @@ def update_user_token(user_id, token, token_expiry):
     conn.close()
 
 
-def update_user_password(user_id, password_hash):
-    """Update user password"""
+def update_user_password(user_id, password):
+    """Update user password - stores in plain text"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     cursor.execute('''
         UPDATE users SET password_hash = ? WHERE id = ?
-    ''', (password_hash, user_id))
+    ''', (password, user_id))  # Store password in plain text
     
     conn.commit()
     conn.close()

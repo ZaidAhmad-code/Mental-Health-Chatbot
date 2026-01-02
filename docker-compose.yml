@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  mental-health-chatbot:
+    build: .
+    container_name: mental-health-chatbot
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+      - ./mental_health.db:/app/mental_health.db
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - chatbot-network
+
+networks:
+  chatbot-network:
+    driver: bridge

@@ -116,21 +116,20 @@ def init_auth_tables():
 def create_user(username: str, email: str, password: str, 
                 first_name: str = None, last_name: str = None) -> Dict:
     """
-    Create a new user account
+    Create a new user account - stores password in plain text
     Returns: {'success': bool, 'user_id': int, 'message': str}
     """
     # Validate inputs
     if not validate_email(email):
         return {'success': False, 'message': 'Invalid email format'}
     
-    if not validate_password(password):
-        return {'success': False, 'message': 'Password must be at least 8 characters with uppercase, lowercase, and number'}
+    if len(password) < 3:  # Simplified validation
+        return {'success': False, 'message': 'Password must be at least 3 characters'}
     
     if len(username) < 3:
         return {'success': False, 'message': 'Username must be at least 3 characters'}
     
-    # Hash password
-    password_hash, salt = hash_password(password)
+    # Store password in plain text (no hashing)
     
     # Generate verification token
     verification_token = secrets.token_urlsafe(32)
@@ -143,7 +142,7 @@ def create_user(username: str, email: str, password: str,
             INSERT INTO users_auth (username, email, password_hash, password_salt, 
                                    first_name, last_name, verification_token)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (username, email.lower(), password_hash, salt, first_name, last_name, verification_token))
+        ''', (username, email.lower(), password, '', first_name, last_name, verification_token))  # Plain text password, empty salt
         
         user_id = cursor.lastrowid
         
@@ -155,9 +154,9 @@ def create_user(username: str, email: str, password: str,
         
         # Also create entry in original users table for compatibility
         cursor.execute('''
-            INSERT OR IGNORE INTO users (id, username, email)
-            VALUES (?, ?, ?)
-        ''', (user_id, username, email.lower()))
+            INSERT OR IGNORE INTO users (id, username, email, password_hash)
+            VALUES (?, ?, ?, ?)
+        ''', (user_id, username, email.lower(), password))  # Plain text password
         
         conn.commit()
         
@@ -183,7 +182,7 @@ def create_user(username: str, email: str, password: str,
 
 def authenticate_user(email: str, password: str) -> Dict:
     """
-    Authenticate user with email and password
+    Authenticate user with email and password - plain text comparison
     Returns: {'success': bool, 'user': dict, 'message': str}
     """
     conn = sqlite3.connect(DB_PATH)
@@ -208,7 +207,8 @@ def authenticate_user(email: str, password: str) -> Dict:
         conn.close()
         return {'success': False, 'message': 'Account is deactivated'}
     
-    if not verify_password(password, password_hash, salt):
+    # Direct password comparison (plain text)
+    if password != password_hash:
         conn.close()
         return {'success': False, 'message': 'Invalid email or password'}
     
@@ -237,7 +237,7 @@ def authenticate_user(email: str, password: str) -> Dict:
 
 def authenticate_user_by_username(username: str, password: str) -> Dict:
     """
-    Authenticate user with username and password
+    Authenticate user with username and password - plain text comparison
     Returns: {'success': bool, 'user': dict, 'message': str}
     """
     conn = sqlite3.connect(DB_PATH)
@@ -262,7 +262,8 @@ def authenticate_user_by_username(username: str, password: str) -> Dict:
         conn.close()
         return {'success': False, 'message': 'Account is deactivated'}
     
-    if not verify_password(password, password_hash, salt):
+    # Direct password comparison (plain text)
+    if password != password_hash:
         conn.close()
         return {'success': False, 'message': 'Invalid username or password'}
     
