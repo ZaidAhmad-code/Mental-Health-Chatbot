@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinical Assessments - MindSpace</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #141419;
+            --bg-tertiary: #1e1e26;
+            --accent-primary: #8b7cd5;
+            --accent-secondary: #6b5ca5;
+            --text-primary: #e8e8f0;
+            --text-secondary: #b0b0c0;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --danger: #ef4444;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            background: linear-gradient(135deg, var(--accent-primary), #b4a1e8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: rgba(139, 124, 213, 0.2);
+            border: 1px solid rgba(139, 124, 213, 0.3);
+            border-radius: 12px;
+            color: var(--accent-primary);
+            text-decoration: none;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(139, 124, 213, 0.3);
+            transform: translateX(-4px);
+        }
+
+        .assessment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .assessment-card {
+            background: rgba(20, 20, 25, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(139, 124, 213, 0.2);
+            border-radius: 20px;
+            padding: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .assessment-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-primary);
+            box-shadow: 0 8px 32px rgba(139, 124, 213, 0.3);
+        }
+
+        .assessment-card h2 {
+            color: var(--accent-primary);
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .assessment-card .subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .assessment-card p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .assessment-card .info {
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .assessment-card .info span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: rgba(20, 20, 25, 0.95);
+            border: 1px solid rgba(139, 124, 213, 0.3);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 700px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            margin-bottom: 30px;
+        }
+
+        .modal-header h2 {
+            color: var(--accent-primary);
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .modal-header p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .question {
+            margin-bottom: 30px;
+        }
+
+        .question-text {
+            font-weight: 500;
+            margin-bottom: 15px;
+            color: var(--text-primary);
+        }
+
+        .question-number {
+            color: var(--accent-primary);
+            margin-right: 8px;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .option {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: rgba(30, 30, 38, 0.6);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .option:hover {
+            background: rgba(30, 30, 38, 0.9);
+            border-color: rgba(139, 124, 213, 0.3);
+        }
+
+        .option input[type="radio"] {
+            margin-right: 12px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .option.selected {
+            background: rgba(139, 124, 213, 0.2);
+            border-color: var(--accent-primary);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 15px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+            flex: 1;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(139, 124, 213, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid rgba(139, 124, 213, 0.3);
+            color: var(--accent-primary);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(139, 124, 213, 0.1);
+        }
+
+        /* Results Styles */
+        .results {
+            display: none;
+        }
+
+        .results.active {
+            display: block;
+        }
+
+        .score-display {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px;
+            background: rgba(30, 30, 38, 0.6);
+            border-radius: 16px;
+        }
+
+        .score-value {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .interpretation {
+            background: rgba(30, 30, 38, 0.6);
+            padding: 25px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+        }
+
+        .interpretation h3 {
+            color: var(--accent-primary);
+            margin-bottom: 15px;
+        }
+
+        .interpretation p {
+            color: var(--text-secondary);
+            line-height: 1.8;
+        }
+
+        .disclaimer {
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+
+        .disclaimer h4 {
+            color: var(--warning);
+            margin-bottom: 10px;
+        }
+
+        .disclaimer p {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        /* Crisis Alert Modal */
+        .crisis-alert-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .crisis-alert-modal {
+            background: var(--bg-card);
+            border: 2px solid var(--danger);
+            border-radius: 20px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(239, 68, 68, 0.5);
+            animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .crisis-header {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            color: white;
+            padding: 25px;
+            border-radius: 18px 18px 0 0;
+            text-align: center;
+        }
+
+        .crisis-header h2 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+            animation: pulse 2s infinite;
+        }
+
+        .crisis-body {
+            padding: 30px;
+        }
+
+        .crisis-message {
+            font-size: 18px;
+            color: var(--text-primary);
+            margin-bottom: 25px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .emergency-resources {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .emergency-resources h3 {
+            color: var(--danger);
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .resource-item {
+            background: var(--bg-elevated);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            border-left: 4px solid var(--danger);
+        }
+
+        .resource-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .resource-item strong {
+            color: var(--text-primary);
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .resource-item a {
+            color: var(--accent-primary);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .resource-item a:hover {
+            color: var(--accent-secondary);
+            text-decoration: underline;
+        }
+
+        .crisis-note {
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            color: var(--text-primary);
+            font-size: 15px;
+        }
+
+        .crisis-footer {
+            padding: 20px 30px;
+            border-top: 1px solid rgba(155, 135, 245, 0.2);
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .assessment-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .modal-content {
+                padding: 25px;
+            }
+
+            .crisis-alert-modal {
+                width: 95%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-btn">
+            ← Back to Chat
+        </a>
+
+        <div class="header">
+            <h1>Clinical Assessments</h1>
+            <p>Validated screening tools to help understand your mental health</p>
+        </div>
+
+        <div class="assessment-grid">
+            <div class="assessment-card" onclick="startAssessment('phq9')">
+                <h2>PHQ-9</h2>
+                <p class="subtitle">Depression Screening</p>
+                <p>The Patient Health Questionnaire (PHQ-9) is a validated tool used to screen for depression. It takes about 2-3 minutes to complete.</p>
+                <div class="info">
+                    <span>📋 9 Questions</span>
+                    <span>⏱️ 2-3 minutes</span>
+                </div>
+            </div>
+
+            <div class="assessment-card" onclick="startAssessment('gad7')">
+                <h2>GAD-7</h2>
+                <p class="subtitle">Anxiety Screening</p>
+                <p>The Generalized Anxiety Disorder (GAD-7) scale is a validated tool to assess anxiety symptoms. Quick and easy to complete.</p>
+                <div class="info">
+                    <span>📋 7 Questions</span>
+                    <span>⏱️ 1-2 minutes</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assessment Modal -->
+    <div id="assessment-modal" class="modal">
+        <div class="modal-content">
+            <!-- Questions View -->
+            <div id="questions-view">
+                <div class="modal-header">
+                    <h2 id="assessment-title"></h2>
+                    <p id="assessment-description"></p>
+                </div>
+
+                <div id="questions-container"></div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-primary" id="submit-btn" onclick="submitAssessment()" disabled>Submit Assessment</button>
+                </div>
+            </div>
+
+            <!-- Results View -->
+            <div id="results-view" class="results">
+                <div class="modal-header">
+                    <h2 id="results-title"></h2>
+                </div>
+
+                <div class="score-display">
+                    <div class="score-value" id="score-value"></div>
+                    <div id="severity-badge"></div>
+                </div>
+
+                <div class="interpretation">
+                    <h3>Interpretation</h3>
+                    <p id="interpretation-text"></p>
+                </div>
+
+                <div class="disclaimer">
+                    <h4>⚠️ Important Note</h4>
+                    <p>This screening tool is not a diagnosis. It's designed to help you and your healthcare provider assess your symptoms. Please consult with a qualified mental health professional for proper evaluation and treatment.</p>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-primary" onclick="closeModal()">Close</button>
+                    <button class="btn btn-secondary" onclick="location.reload()">Take Another Assessment</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAssessmentType = '';
+        let assessmentData = null;
+        let answers = [];
+
+        async function startAssessment(type) {
+            currentAssessmentType = type;
+            answers = [];
+
+            // Fetch assessment questions
+            const response = await fetch(`/api/assessment/${type}`);
+            assessmentData = await response.json();
+
+            // Populate modal
+            document.getElementById('assessment-title').textContent = assessmentData.title;
+            document.getElementById('assessment-description').textContent = assessmentData.description;
+
+            // Build questions
+            const container = document.getElementById('questions-container');
+            container.innerHTML = '';
+
+            assessmentData.questions.forEach((question, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question';
+                questionDiv.innerHTML = `
+                    <div class="question-text">
+                        <span class="question-number">${index + 1}.</span>
+                        ${question}
+                    </div>
+                    <div class="options">
+                        ${assessmentData.options.map(option => `
+                            <label class="option" data-question="${index}">
+                                <input type="radio" name="q${index}" value="${option.value}" onchange="selectOption(${index}, ${option.value})">
+                                <span>${option.text}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                `;
+                container.appendChild(questionDiv);
+            });
+
+            // Show modal
+            document.getElementById('assessment-modal').classList.add('active');
+            document.getElementById('questions-view').style.display = 'block';
+            document.getElementById('results-view').classList.remove('active');
+        }
+
+        function selectOption(questionIndex, value) {
+            answers[questionIndex] = value;
+
+            // Highlight selected option
+            const options = document.querySelectorAll(`[data-question="${questionIndex}"]`);
+            options.forEach(opt => opt.classList.remove('selected'));
+            event.target.closest('.option').classList.add('selected');
+
+            // Enable submit if all answered
+            const allAnswered = answers.length === assessmentData.questions.length && !answers.includes(undefined);
+            document.getElementById('submit-btn').disabled = !allAnswered;
+        }
+
+        async function submitAssessment() {
+            // Show loading
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.textContent = 'Processing...';
+            submitBtn.disabled = true;
+
+            // Submit to backend
+            const response = await fetch(`/api/assessment/${currentAssessmentType}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ answers })
+            });
+
+            const result = await response.json();
+
+            // Show results
+            document.getElementById('questions-view').style.display = 'none';
+            document.getElementById('results-view').classList.add('active');
+
+            document.getElementById('results-title').textContent = assessmentData.title + ' Results';
+            document.getElementById('score-value').textContent = `${result.score} / ${result.max_score}`;
+            
+            const severityBadge = document.getElementById('severity-badge');
+            severityBadge.textContent = result.interpretation.severity;
+            severityBadge.className = 'severity-badge';
+            severityBadge.style.backgroundColor = result.interpretation.color + '30';
+            severityBadge.style.color = result.interpretation.color;
+            severityBadge.style.borderColor = result.interpretation.color;
+
+            document.getElementById('interpretation-text').textContent = result.interpretation.recommendation;
+
+            // Show crisis alert if detected
+            if (result.crisis_alert && result.crisis_alert.requires_intervention) {
+                showCrisisAlertModal(result.crisis_alert);
+            }
+
+            // Reset button
+            submitBtn.textContent = 'Submit Assessment';
+        }
+
+        function showCrisisAlertModal(crisisInfo) {
+            const alertHtml = `
+                <div class="crisis-alert-overlay" id="crisis-overlay">
+                    <div class="crisis-alert-modal">
+                        <div class="crisis-header">
+                            <h2>🆘 ${crisisInfo.level === 'CRITICAL' ? 'CRISIS ALERT' : 'Important: Immediate Support Recommended'}</h2>
+                        </div>
+                        <div class="crisis-body">
+                            <p class="crisis-message">${crisisInfo.message}</p>
+                            
+                            <div class="emergency-resources">
+                                <h3>📞 Emergency Resources:</h3>
+                                <div class="resource-item">
+                                    <strong>National Suicide Prevention Lifeline (US)</strong><br>
+                                    Call: <a href="tel:988">988</a> (Available 24/7)
+                                </div>
+                                <div class="resource-item">
+                                    <strong>Crisis Text Line</strong><br>
+                                    Text: <strong>HOME</strong> to <strong>741741</strong>
+                                </div>
+                                <div class="resource-item">
+                                    <strong>Emergency Services</strong><br>
+                                    Call: <a href="tel:911">911</a>
+                                </div>
+                            </div>
+                            
+                            <p class="crisis-note">
+                                ⚠️ <strong>Please reach out for help immediately.</strong> You are not alone, and professional support is available 24/7.
+                            </p>
+                        </div>
+                        <div class="crisis-footer">
+                            <button class="btn btn-primary" onclick="closeCrisisAlert()">I Understand</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', alertHtml);
+        }
+
+        function closeCrisisAlert() {
+            const overlay = document.getElementById('crisis-overlay');
+            if (overlay) overlay.remove();
+        }
+
+        function closeModal() {
+            document.getElementById('assessment-modal').classList.remove('active');
+            currentAssessmentType = '';
+            answers = [];
+        }
+
+        // Close on background click
+        document.getElementById('assessment-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

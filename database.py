@@ -59,6 +59,22 @@ def init_db():
         )
     ''')
     
+    # Conversations table (for new chat system with sessions)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS conversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            message TEXT NOT NULL,
+            response TEXT NOT NULL,
+            chat_session_id INTEGER,
+            sentiment_score REAL,
+            sentiment_label TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (chat_session_id) REFERENCES chat_sessions(id)
+        )
+    ''')
+    
     # Crisis events table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS crisis_events (
@@ -116,11 +132,32 @@ def init_db():
         )
     ''')
     
+    # Create mood tracker table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mood_tracker (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            mood TEXT NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+    
     # Add chat_session_id to chat_history if not exists
     cursor.execute("PRAGMA table_info(chat_history)")
     columns = [col[1] for col in cursor.fetchall()]
     if 'chat_session_id' not in columns:
         cursor.execute('ALTER TABLE chat_history ADD COLUMN chat_session_id INTEGER')
+    
+    # Add avatar_config to users table if not exists
+    cursor.execute("PRAGMA table_info(users)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if 'avatar_config' not in columns:
+        cursor.execute('ALTER TABLE users ADD COLUMN avatar_config TEXT')
+    if 'display_name' not in columns:
+        cursor.execute('ALTER TABLE users ADD COLUMN display_name TEXT')
+    if 'bio' not in columns:
+        cursor.execute('ALTER TABLE users ADD COLUMN bio TEXT')
     
     conn.commit()
     conn.close()
@@ -210,22 +247,46 @@ def get_chat_history(user_id, limit=50, chat_session_id=None):
     cursor = conn.cursor()
     
     if chat_session_id:
+        # Try conversations table first (new system)
         cursor.execute('''
-            SELECT message, response, created_at
-            FROM chat_history
+            SELECT message, response, timestamp
+            FROM conversations
             WHERE user_id = ? AND chat_session_id = ?
-            ORDER BY created_at ASC
+            ORDER BY timestamp ASC
         ''', (user_id, chat_session_id))
+        results = cursor.fetchall()
+        
+        # If no results, try chat_history table (old system)
+        if not results:
+            cursor.execute('''
+                SELECT message, response, created_at
+                FROM chat_history
+                WHERE user_id = ? AND chat_session_id = ?
+                ORDER BY created_at ASC
+            ''', (user_id, chat_session_id))
+            results = cursor.fetchall()
     else:
+        # Get from conversations table first
         cursor.execute('''
-            SELECT message, response, created_at
-            FROM chat_history
+            SELECT message, response, timestamp
+            FROM conversations
             WHERE user_id = ?
-            ORDER BY created_at DESC
+            ORDER BY timestamp DESC
             LIMIT ?
         ''', (user_id, limit))
+        results = cursor.fetchall()
+        
+        # If no results, fall back to chat_history
+        if not results:
+            cursor.execute('''
+                SELECT message, response, created_at
+                FROM chat_history
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            ''', (user_id, limit))
+            results = cursor.fetchall()
     
-    results = cursor.fetchall()
     conn.close()
     
     return [
@@ -421,7 +482,8 @@ def get_user_by_email(email):
     
     if user:
         columns = ['id', 'username', 'email', 'password_hash', 'token', 
-                   'token_expiry', 'is_verified', 'is_active', 'last_login', 'created_at']
+                   'token_expiry', 'is_verified', 'is_active', 'last_login', 'created_at',
+                   'avatar_config', 'display_name', 'bio']
         return dict(zip(columns, user))
     return None
 
@@ -437,7 +499,8 @@ def get_user_by_username(username):
     
     if user:
         columns = ['id', 'username', 'email', 'password_hash', 'token', 
-                   'token_expiry', 'is_verified', 'is_active', 'last_login', 'created_at']
+                   'token_expiry', 'is_verified', 'is_active', 'last_login', 'created_at',
+                   'avatar_config', 'display_name', 'bio']
         return dict(zip(columns, user))
     return None
 
@@ -453,7 +516,8 @@ def get_user_by_id(user_id):
     
     if user:
         columns = ['id', 'username', 'email', 'password_hash', 'token', 
-                   'token_expiry', 'is_verified', 'is_active', 'last_login', 'created_at']
+                   'token_expiry', 'is_verified', 'is_active', 'last_login', 'created_at',
+                   'avatar_config', 'display_name', 'bio']
         return dict(zip(columns, user))
     return None
 
@@ -507,6 +571,36 @@ def update_user_password(user_id, password_hash):
     
     conn.commit()
     conn.close()
+
+
+def update_user_profile(user_id, **kwargs):
+    """Update user profile fields"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Build dynamic UPDATE query based on provided fields
+    update_fields = []
+    values = []
+    
+    allowed_fields = ['display_name', 'email', 'bio', 'avatar_config']
+    
+    for field, value in kwargs.items():
+        if field in allowed_fields:
+            update_fields.append(f"{field} = ?")
+            values.append(value)
+    
+    if not update_fields:
+        conn.close()
+        return False
+    
+    values.append(user_id)
+    query = f"UPDATE users SET {', '.join(update_fields)} WHERE id = ?"
+    
+    cursor.execute(query, values)
+    conn.commit()
+    conn.close()
+    
+    return True
 
 
 def clear_user_token(user_id):

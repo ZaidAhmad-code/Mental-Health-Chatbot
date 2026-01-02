@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindSpace - AI Mental Health Assistant</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <!-- ==================== HEADER ==================== -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo" onclick="location.reload()">
+                <span class="logo-icon">🌿</span>
+                <span class="logo-text">MindSpace</span>
+            </div>
+            
+            <div class="header-actions">
+                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+                    <span id="theme-icon">🌙</span>
+                </button>
+                
+                <a href="#" class="nav-btn" onclick="openWellnessModal(); return false;">
+                    <span>🧘</span>
+                    <span class="nav-btn-text">Wellness</span>
+                </a>
+                
+                <a href="/assessments" class="nav-btn">
+                    <span>📋</span>
+                    <span class="nav-btn-text">Assessments</span>
+                </a>
+                
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span>Online</span>
+                </div>
+                
+                <!-- Auth Section -->
+                <div class="auth-section" id="auth-section">
+                    <!-- Guest State -->
+                    <div class="auth-guest" id="auth-guest">
+                        <a href="/login" class="auth-btn login-btn">
+                            <span>🔐</span>
+                            <span>Login</span>
+                        </a>
+                        <a href="/login" class="auth-btn register-btn">
+                            <span>✨</span>
+                            <span>Sign Up</span>
+                        </a>
+                    </div>
+                    
+                    <!-- Logged In State -->
+                    <div class="auth-user" id="auth-user" style="display: none;">
+                        <div class="user-profile-btn" id="user-profile-btn">
+                            <div class="user-avatar-small">👤</div>
+                            <span class="user-name" id="user-name-display">User</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </div>
+                        <div class="user-dropdown" id="user-dropdown">
+                            <div class="dropdown-header">
+                                <div class="dropdown-avatar">👤</div>
+                                <div class="dropdown-info">
+                                    <div class="dropdown-name" id="dropdown-name">User Name</div>
+                                    <div class="dropdown-email" id="dropdown-email">user@email.com</div>
+                                </div>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item" onclick="openDashboard()">
+                                <span>📊</span> Dashboard
+                            </a>
+                            <a href="#" class="dropdown-item" onclick="openProfile()">
+                                <span>👤</span> My Profile
+                            </a>
+                            <a href="#" class="dropdown-item" onclick="openSettings()">
+                                <span>⚙️</span> Settings
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item logout-item" onclick="logout()">
+                                <span>🚪</span> Sign Out
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==================== MAIN CONTAINER ==================== -->
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="chat-sidebar">
+            <div class="sidebar-header">
+                <h3>💬 Conversations</h3>
+                <button class="new-chat-btn" onclick="createNewChat()" title="New Chat">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="chat-list" id="chat-list">
+                <!-- Chat sessions loaded dynamically -->
+            </div>
+        </aside>
+        
+        <!-- Sidebar Toggle -->
+        <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+
+        <!-- Main Chat Area -->
+        <main class="main-content">
+            <div class="chat-container">
+                <!-- Chat Header -->
+                <div class="chat-header">
+                    <span id="current-chat-title">New Chat</span>
+                    <button class="edit-title-btn" onclick="editChatTitle()" title="Edit title">✏️</button>
+                </div>
+                
+                <!-- Chat Log -->
+                <div id="chat-log">
+                    <div class="welcome-message">
+                        <div class="welcome-icon">🌿</div>
+                        <h2 class="welcome-title">Welcome to MindSpace</h2>
+                        <p class="welcome-subtitle">Your AI-powered mental health companion. Share your thoughts in a safe, supportive space.</p>
+                        <div class="quick-actions">
+                            <button class="quick-btn" onclick="quickQuery('I\'m feeling anxious')">😰 Feeling Anxious</button>
+                            <button class="quick-btn" onclick="quickQuery('I need coping strategies')">🧘 Coping Strategies</button>
+                            <button class="quick-btn" onclick="quickQuery('How can I improve my mood?')">😊 Mood Help</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Input Area -->
+                <div class="input-container">
+                    <div class="input-wrapper">
+                        <textarea id="user-input" placeholder="Share what's on your mind..." rows="1"></textarea>
+                    </div>
+                    <button id="send-button">Send</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ==================== EMERGENCY BUTTON ==================== -->
+    <button class="emergency-btn">🆘 Emergency</button>
+    <div class="emergency-card">
+        <h3>🆘 Need Immediate Help?</h3>
+        <p class="emergency-note">If you're in crisis, please reach out:</p>
+        <div class="contact-item">
+            <span class="contact-icon">📧</span>
+            <a href="mailto:zaidahmad0152@gmail.com">zaidahmad0152@gmail.com</a>
+        </div>
+        <div class="contact-item">
+            <span class="contact-icon">📞</span>
+            <a href="tel:+94762513253">+94 762 513 253</a>
+        </div>
+        <div class="contact-item">
+            <span class="contact-icon">🌐</span>
+            <a href="https://www.who.int/health-topics/mental-health" target="_blank">WHO Mental Health Resources</a>
+        </div>
+    </div>
+
+    <!-- ==================== FOOTER ==================== -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div>&copy; 2024 Zaid Ahmad - MindSpace AI Assistant</div>
+            <div class="powered-by">
+                Powered by 
+                <span class="llm-badge">GROQ LLAMA 3.3</span>
+                <span class="llm-badge">GEMINI PRO</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ==================== MODALS ==================== -->
+    
+    <!-- Dashboard Modal -->
+    <div class="modal-overlay" id="dashboard-modal" style="display: none;">
+        <div class="modal-container modal-large">
+            <div class="modal-header">
+                <h2>📊 Mental Health Dashboard</h2>
+                <button class="modal-close" onclick="closeModal('dashboard-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Stats Row -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">💬</div>
+                        <div class="stat-value" id="dash-chat-count">0</div>
+                        <div class="stat-label">Conversations</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📋</div>
+                        <div class="stat-value" id="dash-assessment-count">0</div>
+                        <div class="stat-label">Assessments</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🎯</div>
+                        <div class="stat-value" id="dash-days-active">0</div>
+                        <div class="stat-label">Days Active</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⚠️</div>
+                        <div class="stat-value" id="dash-crisis-count">0</div>
+                        <div class="stat-label">Alerts</div>
+                    </div>
+                </div>
+                
+                <!-- Dashboard Sections -->
+                <div class="dashboard-grid">
+                    <!-- Mood Section -->
+                    <div class="dashboard-section">
+                        <h3>📈 Mood Trend</h3>
+                        <div class="mood-chart" id="mood-trend-chart">
+                            <p class="placeholder-text">Loading mood data...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Sentiment Section -->
+                    <div class="dashboard-section">
+                        <h3>💭 Sentiment Analysis</h3>
+                        <div class="sentiment-bars" id="sentiment-section">
+                            <div class="sentiment-bar">
+                                <span class="sentiment-label">Positive</span>
+                                <div class="sentiment-track">
+                                    <div class="sentiment-fill positive" id="sentiment-positive" style="width: 33%"></div>
+                                </div>
+                                <span class="sentiment-value" id="pos-percent">0%</span>
+                            </div>
+                            <div class="sentiment-bar">
+                                <span class="sentiment-label">Neutral</span>
+                                <div class="sentiment-track">
+                                    <div class="sentiment-fill neutral" id="sentiment-neutral" style="width: 34%"></div>
+                                </div>
+                                <span class="sentiment-value" id="neu-percent">0%</span>
+                            </div>
+                            <div class="sentiment-bar">
+                                <span class="sentiment-label">Negative</span>
+                                <div class="sentiment-track">
+                                    <div class="sentiment-fill negative" id="sentiment-negative" style="width: 33%"></div>
+                                </div>
+                                <span class="sentiment-value" id="neg-percent">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Insights -->
+                <div class="dashboard-section full-width">
+                    <h3>💡 Insights</h3>
+                    <div class="insights-grid" id="insights-grid">
+                        <div class="insight-card">
+                            <span class="insight-icon">🌟</span>
+                            <div class="insight-content">
+                                <strong>Welcome!</strong>
+                                <p>Start chatting to receive personalized insights.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Profile Modal -->
+    <div class="modal-overlay" id="profile-modal" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>👤 My Profile</h2>
+                <button class="modal-close" onclick="closeModal('profile-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="profile-form" class="form">
+                    <div class="form-group">
+                        <label>Display Name</label>
+                        <input type="text" id="profile-display-name" placeholder="Your display name">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="profile-email" placeholder="your@email.com" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="profile-username" placeholder="username" readonly>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </form>
+                <div class="danger-zone">
+                    <h4>⚠️ Danger Zone</h4>
+                    <button class="btn btn-outline" onclick="changePassword()">Change Password</button>
+                    <button class="btn btn-danger" onclick="deleteAccount()">Delete Account</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settings-modal" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>⚙️ Settings</h2>
+                <button class="modal-close" onclick="closeModal('settings-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h4>Notifications</h4>
+                    <label class="toggle-setting">
+                        <span>Email notifications</span>
+                        <input type="checkbox" id="setting-email-notif">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <label class="toggle-setting">
+                        <span>Crisis alerts</span>
+                        <input type="checkbox" id="setting-crisis-alerts" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="settings-section">
+                    <h4>Privacy</h4>
+                    <label class="toggle-setting">
+                        <span>Save chat history</span>
+                        <input type="checkbox" id="setting-save-history" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Wellness Modal -->
+    <div class="modal-overlay" id="wellness-modal" style="display: none;">
+        <div class="modal-container modal-large">
+            <div class="modal-header">
+                <h2>🧘 Wellness Center</h2>
+                <button class="modal-close" onclick="closeModal('wellness-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Wellness Stats -->
+                <div class="wellness-stats">
+                    <div class="wellness-stat">
+                        <span class="stat-icon">🔥</span>
+                        <span class="stat-value" id="wellness-streak">0</span>
+                        <span class="stat-label">Day Streak</span>
+                    </div>
+                    <div class="wellness-stat">
+                        <span class="stat-icon">⏱️</span>
+                        <span class="stat-value" id="wellness-minutes">0</span>
+                        <span class="stat-label">Minutes</span>
+                    </div>
+                    <div class="wellness-stat">
+                        <span class="stat-icon">🎯</span>
+                        <span class="stat-value" id="wellness-sessions">0</span>
+                        <span class="stat-label">Sessions</span>
+                    </div>
+                </div>
+                
+                <!-- Tabs -->
+                <div class="wellness-tabs">
+                    <button class="wellness-tab active" onclick="showWellnessTab('breathing')">🌬️ Breathing</button>
+                    <button class="wellness-tab" onclick="showWellnessTab('meditation')">🧘 Meditation</button>
+                </div>
+                
+                <!-- Content -->
+                <div class="wellness-content" id="breathing-tab">
+                    <div class="exercises-grid" id="breathing-exercises-grid">
+                        <p class="placeholder-text">Loading exercises...</p>
+                    </div>
+                </div>
+                <div class="wellness-content" id="meditation-tab" style="display: none;">
+                    <div class="exercises-grid" id="meditation-exercises-grid">
+                        <p class="placeholder-text">Loading sessions...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== SCRIPTS ==================== -->
+    <script src="/static/js/app.js"></script>
+    <script>
+        // Additional page-specific initialization
+        $(document).ready(function() {
+            // Auto-resize textarea
+            $('#user-input').on('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+            });
+            
+            // Focus input on load
+            $('#user-input').focus();
+        });
+    </script>
+</body>
+</html>

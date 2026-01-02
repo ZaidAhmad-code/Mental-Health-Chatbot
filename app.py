@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, Response
+from flask import Flask, render_template, request, jsonify, session, Response, redirect, url_for
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_classic.chains import RetrievalQA
@@ -15,7 +15,7 @@ from database import (init_db, save_assessment_result, get_user_assessments,
                      save_sentiment, get_sentiment_history,
                      get_mood_trend, get_user_preferences, save_user_preferences,
                      create_chat_session, get_user_chat_sessions, update_chat_session_title,
-                     delete_chat_session, get_chat_session, get_chat_history)
+                     delete_chat_session, get_chat_session, get_chat_history, update_user_profile)
 from crisis_detection import CrisisDetector, format_crisis_response
 
 # Phase 1 Improvements
@@ -100,7 +100,16 @@ def get_user_id():
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    # Check if user is logged in
+    session_token = session.get('session_token')
+    if session_token:
+        # Validate session
+        user_data = validate_session(session_token)
+        if user_data:
+            return render_template('index.html')
+    
+    # Not logged in, redirect to login page
+    return redirect(url_for('login_page'))
 
 
 @app.route('/login')
@@ -329,6 +338,155 @@ def load_chat_session(session_id):
         'session': session_data,
         'messages': messages
     })
+
+
+# ==================== DASHBOARD API ENDPOINTS ====================
+
+@app.route('/api/dashboard/stats', methods=['GET'])
+def dashboard_stats():
+    """Get dashboard statistics for the current user"""
+    user_id = get_user_id()
+    
+    try:
+        from database import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get total chats
+        cursor.execute("SELECT COUNT(*) FROM chat_sessions WHERE user_id = ?", (user_id,))
+        total_chats = cursor.fetchone()[0]
+        
+        # Get total messages
+        cursor.execute("SELECT COUNT(*) FROM conversations WHERE user_id = ?", (user_id,))
+        total_messages = cursor.fetchone()[0]
+        
+        # Calculate streak (days with activity)
+        cursor.execute("""
+            SELECT COUNT(DISTINCT DATE(timestamp)) 
+            FROM conversations 
+            WHERE user_id = ? 
+            AND DATE(timestamp) >= DATE('now', '-7 days')
+        """, (user_id,))
+        streak_days = cursor.fetchone()[0]
+        
+        # Get recent activity
+        cursor.execute("""
+            SELECT cs.title, c.timestamp
+            FROM conversations c
+            JOIN chat_sessions cs ON c.chat_session_id = cs.id
+            WHERE c.user_id = ?
+            ORDER BY c.timestamp DESC
+            LIMIT 5
+        """, (user_id,))
+        
+        recent_activity = []
+        for row in cursor.fetchall():
+            title, timestamp = row
+            recent_activity.append({
+                'title': title or 'Chat Session',
+                'description': 'Message sent',
+                'time': format_timestamp(timestamp)
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'total_chats': total_chats,
+            'total_messages': total_messages // 2 if total_messages > 0 else 0,  # Divide by 2 (user + bot messages)
+            'streak_days': streak_days,
+            'recent_activity': recent_activity
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching dashboard stats: {e}")
+        return jsonify({
+            'total_chats': 0,
+            'total_messages': 0,
+            'streak_days': 0,
+            'recent_activity': []
+        }), 200  # Return empty data instead of error
+
+
+@app.route('/api/dashboard/mood', methods=['POST'])
+def save_mood():
+    """Save user mood to database"""
+    user_id = get_user_id()
+    data = request.get_json() or {}
+    mood = data.get('mood')
+    
+    if not mood:
+        return jsonify({'error': 'Mood is required'}), 400
+    
+    try:
+        from database import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Save mood entry
+        cursor.execute("""
+            INSERT INTO mood_tracker (user_id, mood, timestamp)
+            VALUES (?, ?, datetime('now'))
+        """, (user_id, mood))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'message': 'Mood saved successfully'})
+        
+    except Exception as e:
+        logger.error(f"Error saving mood: {e}")
+        return jsonify({'error': 'Failed to save mood'}), 500
+
+
+@app.route('/api/chats/clear', methods=['DELETE'])
+def clear_all_chats():
+    """Clear all chat history for the current user"""
+    user_id = get_user_id()
+    
+    try:
+        from database import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Delete all conversations
+        cursor.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
+        
+        # Delete all chat sessions
+        cursor.execute("DELETE FROM chat_sessions WHERE user_id = ?", (user_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'message': 'All chats cleared successfully'})
+        
+    except Exception as e:
+        logger.error(f"Error clearing chats: {e}")
+        return jsonify({'error': 'Failed to clear chats'}), 500
+
+
+def format_timestamp(timestamp_str):
+    """Format timestamp to human-readable format"""
+    try:
+        from datetime import datetime
+        dt = datetime.fromisoformat(timestamp_str)
+        now = datetime.now()
+        diff = now - dt
+        
+        if diff.days == 0:
+            if diff.seconds < 3600:
+                minutes = diff.seconds // 60
+                return f"{minutes}m ago"
+            else:
+                hours = diff.seconds // 3600
+                return f"{hours}h ago"
+        elif diff.days == 1:
+            return "Yesterday"
+        elif diff.days < 7:
+            return f"{diff.days}d ago"
+        else:
+            return dt.strftime("%b %d")
+    except:
+        return "Recently"
 
 
 @app.route('/api/assessment/phq9', methods=['GET', 'POST'])
@@ -958,6 +1116,8 @@ def profile():
                     'username': user['username'],
                     'email': user['email'],
                     'display_name': user.get('display_name', user['username']),
+                    'bio': user.get('bio', ''),
+                    'avatar_config': user.get('avatar_config', ''),
                     'created_at': user['created_at'],
                     'last_login': user['last_login']
                 }
@@ -966,8 +1126,71 @@ def profile():
     
     elif request.method == 'PUT':
         data = request.get_json()
-        # Update profile logic here
-        return jsonify({'success': True, 'message': 'Profile updated'})
+        
+        # Extract fields to update
+        update_fields = {}
+        if 'display_name' in data:
+            update_fields['display_name'] = data['display_name']
+        if 'email' in data:
+            update_fields['email'] = data['email']
+        if 'bio' in data:
+            update_fields['bio'] = data['bio']
+        if 'avatar_config' in data:
+            update_fields['avatar_config'] = data['avatar_config']
+        
+        # Update profile
+        if update_user_profile(user_id, **update_fields):
+            return jsonify({'success': True, 'message': 'Profile updated successfully'})
+        else:
+            return jsonify({'error': 'No valid fields to update'}), 400
+
+
+@app.route('/api/auth/avatar', methods=['POST'])
+@handle_errors("Avatar upload endpoint")
+def upload_avatar():
+    """Upload user avatar"""
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    if 'avatar' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+    
+    file = request.files['avatar']
+    
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    # Check file extension
+    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    filename = file.filename.lower()
+    if not any(filename.endswith('.' + ext) for ext in allowed_extensions):
+        return jsonify({'error': 'Invalid file type. Allowed: png, jpg, jpeg, gif, webp'}), 400
+    
+    try:
+        # Create avatars directory if it doesn't exist
+        avatars_dir = os.path.join('static', 'avatars')
+        os.makedirs(avatars_dir, exist_ok=True)
+        
+        # Save with user_id as filename
+        file_ext = filename.rsplit('.', 1)[1]
+        avatar_filename = f"{user_id}.{file_ext}"
+        avatar_path = os.path.join(avatars_dir, avatar_filename)
+        
+        file.save(avatar_path)
+        
+        logger.info(f"Avatar uploaded for user {user_id}: {avatar_filename}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Avatar uploaded successfully',
+            'avatar_url': f'/static/avatars/{avatar_filename}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error uploading avatar: {e}")
+        return jsonify({'error': 'Failed to upload avatar'}), 500
 
 
 @app.route('/api/auth/preferences', methods=['GET', 'PUT'])
