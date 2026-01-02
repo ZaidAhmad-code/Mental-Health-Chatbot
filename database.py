@@ -4,6 +4,14 @@ import os
 
 DB_PATH = 'mental_health.db'
 
+
+def get_db_connection():
+    """Get a database connection with row factory"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
 def init_db():
     """Initialize the database with required tables"""
     conn = sqlite3.connect(DB_PATH)

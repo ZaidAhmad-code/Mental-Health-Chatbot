@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, Response
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_classic.chains import RetrievalQA
@@ -35,6 +35,16 @@ from auth import (init_auth_tables, create_user as auth_create_user, authenticat
 from notifications import EmailService
 from sentiment_analysis import SentimentAnalyzer
 from api_docs import api_docs_bp
+
+# Phase 3 Improvements - Advanced Features
+from streaming import streaming_chain, stream_chat_response
+from predictive_analytics import (get_risk_prediction, get_mood_forecast, 
+                                   get_user_patterns, get_comprehensive_analysis)
+
+# Phase 4 - Wellness Features
+from wellness import (get_breathing_exercises, get_meditation_sessions, get_exercise_by_id,
+                      save_wellness_session, get_wellness_stats, get_recommended_exercises,
+                      init_wellness_tables)
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-change-this-in-production'  # Change this!
@@ -539,6 +549,238 @@ def analytics_mood_trend():
             trend_label = 'Declining'
     
     return jsonify({'trend': trend_label, 'data': trend_data})
+
+
+# ========== PHASE 3: Streaming Chat ==========
+
+@app.route('/api/chat/stream', methods=['POST'])
+@handle_errors("Streaming chat endpoint")
+def stream_chat():
+    """Stream chat response using Server-Sent Events with crisis detection"""
+    import json
+    
+    user_id = get_user_id()
+    data = request.get_json() or {}
+    query = data.get('query', '').strip()
+    chat_session_id = data.get('chat_session_id')
+    
+    if not query:
+        return jsonify({'error': 'Query is required'}), 400
+    
+    # Check for crisis FIRST before streaming
+    crisis_detector = CrisisDetector()
+    crisis_info = crisis_detector.detect_crisis(query)
+    
+    def generate():
+        """Generator function for SSE streaming with crisis info at end"""
+        try:
+            # Get conversation context
+            conversation_history = ConversationContextBuilder.get_conversation_history(user_id)
+            context = f"Conversation history:\n{conversation_history}" if conversation_history else ""
+            
+            # If crisis detected, add crisis context
+            if crisis_info['is_crisis']:
+                context += "\n[IMPORTANT: User may be in crisis. Provide empathetic support and include crisis resources.]"
+            
+            # Get streaming response from LLM
+            from streaming import StreamingLLMChain
+            streaming_chain = StreamingLLMChain()
+            
+            full_response = ""
+            for chunk in streaming_chain.stream_response(query, context):
+                # Parse the SSE format to extract content
+                if 'data: ' in chunk:
+                    try:
+                        data_str = chunk.replace('data: ', '').strip()
+                        if data_str:
+                            data_obj = json.loads(data_str)
+                            if data_obj.get('type') == 'token':
+                                full_response += data_obj.get('content', '')
+                                yield chunk
+                            elif data_obj.get('type') == 'done':
+                                # Don't yield the done, we'll send our own with crisis info
+                                pass
+                            else:
+                                yield chunk
+                    except:
+                        yield chunk
+            
+            # Save conversation to database
+            try:
+                if chat_session_id:
+                    from database import get_db_connection
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    
+                    # Update sentiment analysis
+                    sentiment = sentiment_analyzer.analyze(query) if hasattr(sentiment_analyzer, 'analyze') else None
+                    
+                    cursor.execute("""
+                        INSERT INTO conversations (user_id, message, response, chat_session_id, sentiment_score, sentiment_label)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        user_id, query, full_response, chat_session_id,
+                        sentiment.get('score') if sentiment else 0,
+                        sentiment.get('label') if sentiment else 'neutral'
+                    ))
+                    
+                    # Update session timestamp
+                    cursor.execute("UPDATE chat_sessions SET updated_at = datetime('now') WHERE id = ?", (chat_session_id,))
+                    conn.commit()
+                    conn.close()
+            except Exception as e:
+                logger.error(f"Failed to save streaming conversation: {e}")
+            
+            # Send final done message with crisis info
+            done_data = {
+                'type': 'done',
+                'crisis_detected': crisis_info['is_crisis'],
+                'crisis_level': crisis_info.get('severity'),
+                'crisis_resources': crisis_detector.get_crisis_resources() if crisis_info['is_crisis'] else None,
+                'full_response': full_response
+            }
+            yield f"data: {json.dumps(done_data)}\n\n"
+            
+        except Exception as e:
+            logger.error(f"Streaming error: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+    
+    logger.info(f"Streaming response for user {user_id}")
+    
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no'
+        }
+    )
+
+
+# ========== PHASE 3: Predictive Analytics ==========
+
+@app.route('/api/predictive/risk', methods=['GET'])
+@handle_errors("Risk prediction endpoint")
+def risk_prediction():
+    """Get mental health risk prediction for user"""
+    user_id = get_user_id()
+    days = request.args.get('days', default=14, type=int)
+    
+    prediction = get_risk_prediction(user_id, days)
+    logger.info(f"Risk prediction generated for user {user_id}: {prediction.get('risk_level')}")
+    
+    return jsonify(prediction)
+
+
+@app.route('/api/predictive/forecast', methods=['GET'])
+@handle_errors("Mood forecast endpoint")
+def mood_forecast():
+    """Get mood forecast for user"""
+    user_id = get_user_id()
+    days_ahead = request.args.get('days', default=7, type=int)
+    
+    forecast = get_mood_forecast(user_id, days_ahead)
+    return jsonify(forecast)
+
+
+@app.route('/api/predictive/patterns', methods=['GET'])
+@handle_errors("Pattern detection endpoint")
+def pattern_detection():
+    """Get detected patterns for user"""
+    user_id = get_user_id()
+    days = request.args.get('days', default=30, type=int)
+    
+    patterns = get_user_patterns(user_id, days)
+    return jsonify(patterns)
+
+
+@app.route('/api/predictive/comprehensive', methods=['GET'])
+@handle_errors("Comprehensive analysis endpoint")
+def comprehensive_analysis():
+    """Get comprehensive predictive analysis"""
+    user_id = get_user_id()
+    
+    analysis = get_comprehensive_analysis(user_id)
+    logger.info(f"Comprehensive analysis generated for user {user_id}")
+    
+    return jsonify(analysis)
+
+
+# ========== PHASE 4: Wellness - Meditation & Breathing ==========
+
+@app.route('/api/wellness/breathing', methods=['GET'])
+@handle_errors("Get breathing exercises")
+def get_breathing():
+    """Get all available breathing exercises"""
+    exercises = get_breathing_exercises()
+    return jsonify({'exercises': exercises})
+
+
+@app.route('/api/wellness/meditation', methods=['GET'])
+@handle_errors("Get meditation sessions")
+def get_meditation():
+    """Get all available meditation sessions"""
+    sessions = get_meditation_sessions()
+    return jsonify({'sessions': sessions})
+
+
+@app.route('/api/wellness/exercise/<exercise_id>', methods=['GET'])
+@handle_errors("Get exercise details")
+def get_exercise(exercise_id):
+    """Get details for a specific exercise"""
+    exercise = get_exercise_by_id(exercise_id)
+    if not exercise:
+        return jsonify({'error': 'Exercise not found'}), 404
+    return jsonify(exercise)
+
+
+@app.route('/api/wellness/recommend', methods=['GET'])
+@handle_errors("Get recommendations")
+def get_recommendations():
+    """Get personalized exercise recommendations"""
+    user_id = get_user_id()
+    mood = request.args.get('mood')
+    time_available = request.args.get('time', type=int)
+    
+    recommendations = get_recommended_exercises(user_id, mood, time_available)
+    return jsonify({'recommendations': recommendations})
+
+
+@app.route('/api/wellness/session', methods=['POST'])
+@handle_errors("Save wellness session")
+def save_session():
+    """Save a completed wellness session"""
+    user_id = get_user_id()
+    data = request.get_json() or {}
+    
+    session_type = data.get('session_type')  # 'breathing' or 'meditation'
+    exercise_id = data.get('exercise_id')
+    duration_seconds = data.get('duration_seconds', 0)
+    completed = data.get('completed', True)
+    mood_before = data.get('mood_before')
+    mood_after = data.get('mood_after')
+    notes = data.get('notes')
+    
+    if not session_type or not exercise_id:
+        return jsonify({'error': 'session_type and exercise_id are required'}), 400
+    
+    result = save_wellness_session(
+        user_id, session_type, exercise_id, duration_seconds,
+        completed, mood_before, mood_after, notes
+    )
+    
+    logger.info(f"Wellness session saved for user {user_id}: {exercise_id}")
+    return jsonify(result)
+
+
+@app.route('/api/wellness/stats', methods=['GET'])
+@handle_errors("Get wellness stats")
+def wellness_stats():
+    """Get user's wellness statistics and streaks"""
+    user_id = get_user_id()
+    stats = get_wellness_stats(user_id)
+    return jsonify(stats)
 
 
 # ========== PHASE 1: Memory & Cache Management ==========
