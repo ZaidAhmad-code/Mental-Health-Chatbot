@@ -5,6 +5,7 @@ __pycache__/
 chroma_db/
 .idea/
 *.log
+logs/
 venv/
 env/
 .venv/
@@ -17,3 +18,4 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+mental_health.db

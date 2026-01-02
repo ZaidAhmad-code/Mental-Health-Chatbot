@@ -347,6 +347,132 @@
             color: var(--text-secondary);
         }
 
+        /* Crisis Alert Modal */
+        .crisis-alert-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .crisis-alert-modal {
+            background: var(--bg-card);
+            border: 2px solid var(--danger);
+            border-radius: 20px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(239, 68, 68, 0.5);
+            animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .crisis-header {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            color: white;
+            padding: 25px;
+            border-radius: 18px 18px 0 0;
+            text-align: center;
+        }
+
+        .crisis-header h2 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+            animation: pulse 2s infinite;
+        }
+
+        .crisis-body {
+            padding: 30px;
+        }
+
+        .crisis-message {
+            font-size: 18px;
+            color: var(--text-primary);
+            margin-bottom: 25px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .emergency-resources {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .emergency-resources h3 {
+            color: var(--danger);
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .resource-item {
+            background: var(--bg-elevated);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            border-left: 4px solid var(--danger);
+        }
+
+        .resource-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .resource-item strong {
+            color: var(--text-primary);
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .resource-item a {
+            color: var(--accent-primary);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .resource-item a:hover {
+            color: var(--accent-secondary);
+            text-decoration: underline;
+        }
+
+        .crisis-note {
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            color: var(--text-primary);
+            font-size: 15px;
+        }
+
+        .crisis-footer {
+            padding: 20px 30px;
+            border-top: 1px solid rgba(155, 135, 245, 0.2);
+            text-align: center;
+        }
+
         @media (max-width: 768px) {
             .assessment-grid {
                 grid-template-columns: 1fr;
@@ -354,6 +480,10 @@
 
             .modal-content {
                 padding: 25px;
+            }
+
+            .crisis-alert-modal {
+                width: 95%;
             }
         }
     </style>
@@ -530,8 +660,58 @@
 
             document.getElementById('interpretation-text').textContent = result.interpretation.recommendation;
 
+            // Show crisis alert if detected
+            if (result.crisis_alert && result.crisis_alert.requires_intervention) {
+                showCrisisAlertModal(result.crisis_alert);
+            }
+
             // Reset button
             submitBtn.textContent = 'Submit Assessment';
+        }
+
+        function showCrisisAlertModal(crisisInfo) {
+            const alertHtml = `
+                <div class="crisis-alert-overlay" id="crisis-overlay">
+                    <div class="crisis-alert-modal">
+                        <div class="crisis-header">
+                            <h2>🆘 ${crisisInfo.level === 'CRITICAL' ? 'CRISIS ALERT' : 'Important: Immediate Support Recommended'}</h2>
+                        </div>
+                        <div class="crisis-body">
+                            <p class="crisis-message">${crisisInfo.message}</p>
+                            
+                            <div class="emergency-resources">
+                                <h3>📞 Emergency Resources:</h3>
+                                <div class="resource-item">
+                                    <strong>National Suicide Prevention Lifeline (US)</strong><br>
+                                    Call: <a href="tel:988">988</a> (Available 24/7)
+                                </div>
+                                <div class="resource-item">
+                                    <strong>Crisis Text Line</strong><br>
+                                    Text: <strong>HOME</strong> to <strong>741741</strong>
+                                </div>
+                                <div class="resource-item">
+                                    <strong>Emergency Services</strong><br>
+                                    Call: <a href="tel:911">911</a>
+                                </div>
+                            </div>
+                            
+                            <p class="crisis-note">
+                                ⚠️ <strong>Please reach out for help immediately.</strong> You are not alone, and professional support is available 24/7.
+                            </p>
+                        </div>
+                        <div class="crisis-footer">
+                            <button class="btn btn-primary" onclick="closeCrisisAlert()">I Understand</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', alertHtml);
+        }
+
+        function closeCrisisAlert() {
+            const overlay = document.getElementById('crisis-overlay');
+            if (overlay) overlay.remove();
         }
 
         function closeModal() {
