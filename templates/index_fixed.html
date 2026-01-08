@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serene - AI Mental Health Assistant</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/static/images/serene.png">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <!-- ==================== HEADER ==================== -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo" onclick="location.reload()">
+                <img src="/static/images/serene.png" alt="Serene" class="logo-img">
+                <span class="logo-text">Serene</span>
+            </div>
+            
+            <div class="header-actions">
+                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+                    <span id="theme-icon">🌙</span>
+                </button>
+                
+                <a href="#" class="nav-btn" onclick="openWellnessModal(); return false;">
+                    <span>🧘</span>
+                    <span class="nav-btn-text">Wellness</span>
+                </a>
+                
+                <a href="/assessments" class="nav-btn">
+                    <span>📋</span>
+                    <span class="nav-btn-text">Assessments</span>
+                </a>
+                
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span>Online</span>
+                </div>
+                
+                <!-- Auth Section -->
+                <div class="auth-section" id="auth-section">
+                    <!-- Guest State -->
+                    <div class="auth-guest" id="auth-guest">
+                        <a href="/login" class="auth-btn login-btn">
+                            <span>🔐</span>
+                            <span>Login</span>
+                        </a>
+                        <a href="/login" class="auth-btn register-btn">
+                            <span>✨</span>
+                            <span>Sign Up</span>
+                        </a>
+                    </div>
+                    
+                    <!-- Logged In State -->
+                    <div class="auth-user" id="auth-user" style="display: none;">
+                        <div class="user-profile-btn" id="user-profile-btn">
+                            <div class="user-avatar-small">👤</div>
+                            <span class="user-name" id="user-name-display">User</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </div>
+                        <div class="user-dropdown" id="user-dropdown">
+                            <div class="dropdown-header">
+                                <div class="dropdown-avatar">👤</div>
+                                <div class="dropdown-info">
+                                    <div class="dropdown-name" id="dropdown-name">User Name</div>
+                                    <div class="dropdown-email" id="dropdown-email">user@email.com</div>
+                                </div>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item" onclick="openDashboard()">
+                                <span>📊</span> Dashboard
+                            </a>
+                            <a href="#" class="dropdown-item" onclick="openProfile()">
+                                <span>👤</span> My Profile
+                            </a>
+                            <a href="#" class="dropdown-item" onclick="openSettings()">
+                                <span>⚙️</span> Settings
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item logout-item" onclick="logout()">
+                                <span>🚪</span> Sign Out
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==================== MAIN CONTAINER ==================== -->
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="chat-sidebar" id="chat-sidebar">
+            <div class="sidebar-header">
+                <h3>💬 Conversations</h3>
+                <button class="new-chat-btn" onclick="createNewChat()" title="New Chat">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="chat-list" id="chat-list">
+                <!-- Chat sessions loaded dynamically -->
+            </div>
+        </aside>
+        
+        <!-- Sidebar Toggle -->
+        <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+
+        <!-- Main Chat Area -->
+        <main class="main-content">
+            <div class="chat-container">
+                <!-- Chat Header -->
+                <div class="chat-header">
+                    <span id="current-chat-title">New Chat</span>
+                    <button class="edit-title-btn" onclick="editChatTitle()" title="Edit title">✏️</button>
+                </div>
+                
+                <!-- Chat Log -->
+                <div id="chat-log">
+                    <div class="welcome-message">
+                        <img src="/static/images/serene.png" alt="Serene" class="welcome-logo">
+                        <h2 class="welcome-title">Welcome to Serene</h2>
+                        <p class="welcome-subtitle">Your AI-powered mental health companion. Share your thoughts in a safe, supportive space.</p>
+                        <div class="quick-actions">
+                            <button class="quick-btn" onclick="quickQuery('I\'m feeling anxious')">😰 Feeling Anxious</button>
+                            <button class="quick-btn" onclick="quickQuery('I need coping strategies')">🧘 Coping Strategies</button>
+                            <button class="quick-btn" onclick="quickQuery('How can I improve my mood?')">😊 Mood Help</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Input Area -->
+                <div class="input-container">
+                    <div class="input-wrapper">
+                        <textarea id="user-input" placeholder="Share what's on your mind..." rows="1"></textarea>
+                    </div>
+                    <button id="send-button">Send</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ==================== EMERGENCY BUTTON ==================== -->
+    <button class="emergency-btn">🆘 Emergency</button>
+    <div class="emergency-card">
+        <h3>🆘 Need Immediate Help?</h3>
+        <p class="emergency-note">If you're in crisis, please reach out to these Sri Lankan services:</p>
+        
+        <div class="contact-item">
+            <span class="contact-icon">📞</span>
+            <div>
+                <strong>Emergency Services</strong>
+                <a href="tel:119">119</a> (Police, Fire, Ambulance)
+            </div>
+        </div>
+        
+        <div class="contact-item">
+            <span class="contact-icon">🏥</span>
+            <div>
+                <strong>Suwa Seriya Ambulance</strong>
+                <a href="tel:1990">1990</a> (Free 24/7)
+            </div>
+        </div>
+        
+        <div class="contact-item">
+            <span class="contact-icon">💚</span>
+            <div>
+                <strong>Sumithrayo (Suicide Prevention)</strong>
+                <a href="tel:+94112682535">+94 11 268 2535</a>
+            </div>
+        </div>
+        
+        <div class="contact-item">
+            <span class="contact-icon">🧠</span>
+            <div>
+                <strong>National Institute of Mental Health</strong>
+                <a href="tel:+94112696211">+94 11 269 6211</a>
+            </div>
+        </div>
+        
+        <div class="contact-item">
+            <span class="contact-icon">☎️</span>
+            <div>
+                <strong>Mental Health Helpline</strong>
+                <a href="tel:1926">1926</a> (24/7 Support)
+            </div>
+        </div>
+        
+        <p class="emergency-disclaimer">Remember: You're not alone. Help is always available. 💙</p>
+    </div>
+
+    <!-- ==================== WELLNESS MODAL ==================== -->
+    <div id="wellness-modal" class="modal">
+        <div class="modal-content wellness-modal">
+            <span class="close" onclick="closeWellnessModal()">&times;</span>
+            <h2>🧘 Wellness Resources</h2>
+            
+            <div class="wellness-grid">
+                <div class="wellness-card">
+                    <div class="wellness-icon">🌬️</div>
+                    <h3>Breathing Exercises</h3>
+                    <p>Try box breathing: Inhale for 4, hold for 4, exhale for 4, hold for 4. Repeat.</p>
+                    <button onclick="startBreathingExercise()">Start Exercise</button>
+                </div>
+                
+                <div class="wellness-card">
+                    <div class="wellness-icon">🎵</div>
+                    <h3>Calming Music</h3>
+                    <p>Listen to soothing sounds and music to help reduce stress and anxiety.</p>
+                    <button onclick="window.open('https://www.calm.com', '_blank')">Explore</button>
+                </div>
+                
+                <div class="wellness-card">
+                    <div class="wellness-icon">📝</div>
+                    <h3>Journaling</h3>
+                    <p>Express your thoughts and feelings through writing. It can be therapeutic.</p>
+                    <button onclick="openJournal()">Start Journaling</button>
+                </div>
+                
+                <div class="wellness-card">
+                    <div class="wellness-icon">🚶</div>
+                    <h3>Mindful Walking</h3>
+                    <p>Take a short walk and focus on your surroundings. Notice the details.</p>
+                    <button onclick="alert('Take a 10-minute mindful walk. Focus on your breath and surroundings.')">Learn More</button>
+                </div>
+                
+                <div class="wellness-card">
+                    <div class="wellness-icon">💤</div>
+                    <h3>Sleep Hygiene</h3>
+                    <p>Tips for better sleep: consistent schedule, cool room, no screens before bed.</p>
+                    <button onclick="showSleepTips()">View Tips</button>
+                </div>
+                
+                <div class="wellness-card">
+                    <div class="wellness-icon">🙏</div>
+                    <h3>Gratitude Practice</h3>
+                    <p>List three things you're grateful for today. Gratitude boosts mood.</p>
+                    <button onclick="startGratitude()">Start Practice</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== SCRIPTS ==================== -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

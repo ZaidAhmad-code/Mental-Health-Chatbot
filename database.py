@@ -2,7 +2,12 @@ import sqlite3
 from datetime import datetime
 import os
 
-DB_PATH = 'mental_health.db'
+# Use data directory for Docker volume mounting
+DB_DIR = 'data'
+DB_PATH = os.path.join(DB_DIR, 'mental_health.db')
+
+# Ensure data directory exists
+os.makedirs(DB_DIR, exist_ok=True)
 
 
 def get_db_connection():

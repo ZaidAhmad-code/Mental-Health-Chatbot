@@ -9,6 +9,3 @@ sentence-transformers
 pypdf
 python-dotenv
 flask-socketio
-eventlet
-
-google-generativeai
