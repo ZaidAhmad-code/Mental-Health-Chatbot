@@ -126,7 +126,7 @@ NOW RESPONDING TO: {query}"""
         response = response.strip()
         
         # Remove any "Assistant:" or "Chatbot:" prefixes the model might add
-        prefixes_to_remove = ["Assistant:", "Chatbot:", "MindSpace:", "Bot:", "Response:"]
+        prefixes_to_remove = ["Assistant:", "Chatbot:", "MindSpace:", "Serene:", "Bot:", "Response:"]
         for prefix in prefixes_to_remove:
             if response.startswith(prefix):
                 response = response[len(prefix):].strip()

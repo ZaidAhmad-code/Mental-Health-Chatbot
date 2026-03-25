@@ -47,7 +47,7 @@ from wellness import (get_breathing_exercises, get_meditation_sessions, get_exer
                       init_wellness_tables)
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-this-in-production'  # Change this!
+app.secret_key = os.getenv('SECRET_KEY', 'mindspace-fallback-secret-key')
 
 # Register API documentation blueprint
 app.register_blueprint(api_docs_bp, url_prefix='/api/docs')
