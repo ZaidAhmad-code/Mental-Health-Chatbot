@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, session, Response, redirect, url_for
+from flask_cors import CORS
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_classic.chains import RetrievalQA
@@ -47,6 +48,12 @@ from wellness import (get_breathing_exercises, get_meditation_sessions, get_exer
                       init_wellness_tables)
 
 app = Flask(__name__)
+CORS(app, 
+     supports_credentials=True, 
+     origins=["http://localhost:3000"],
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
 app.secret_key = 'your-secret-key-change-this-in-production'  # Change this!
 
 # Register API documentation blueprint
