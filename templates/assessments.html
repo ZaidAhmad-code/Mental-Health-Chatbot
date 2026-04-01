@@ -619,8 +619,24 @@
             <div class="history-list" id="history-list">
                 <p style="color: var(--text-muted); text-align: center; padding: 20px;">No assessments yet</p>
             </div>
+
+            <!-- Score History Charts -->
+            <div id="charts-section" style="display:none; margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 16px; padding: 20px;">
+                    <h3 style="font-size:15px; margin-bottom:12px;">🧠 PHQ-9 Score History</h3>
+                    <canvas id="phq9-chart" height="160"></canvas>
+                    <p id="phq9-empty" style="color:var(--text-muted);text-align:center;font-size:13px;display:none;">Take the PHQ-9 to see your trend.</p>
+                </div>
+                <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 16px; padding: 20px;">
+                    <h3 style="font-size:15px; margin-bottom:12px;">💭 GAD-7 Score History</h3>
+                    <canvas id="gad7-chart" height="160"></canvas>
+                    <p id="gad7-empty" style="color:var(--text-muted);text-align:center;font-size:13px;display:none;">Take the GAD-7 to see your trend.</p>
+                </div>
+            </div>
         </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
     <script>
         // Theme
@@ -782,8 +798,17 @@
                 <p>${severity.desc}</p>
             `;
             
-            // Save to server
+            // Save to server and get comparison
             try {
+                // Get previous score before saving
+                const histRes = await fetch('/api/assessments/history');
+                let previousScore = null;
+                if (histRes.ok) {
+                    const histData = await histRes.json();
+                    const prev = (histData.assessments || []).find(a => a.assessment_type === currentAssessment.name.toLowerCase());
+                    if (prev) previousScore = prev.total_score;
+                }
+
                 await fetch('/api/assessments/submit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -793,6 +818,18 @@
                         score: score
                     })
                 });
+
+                // Show comparison if we have a previous score
+                if (previousScore !== null) {
+                    const diff = score - previousScore;
+                    const compEl = document.createElement('div');
+                    compEl.className = `score-comparison ${diff < 0 ? 'improved' : diff > 0 ? 'worsened' : 'same'}`;
+                    if (diff < 0) compEl.innerHTML = `📉 Improved by ${Math.abs(diff)} pts since last time`;
+                    else if (diff > 0) compEl.innerHTML = `📈 Increased by ${diff} pts since last time`;
+                    else compEl.innerHTML = `➡️ Same as last time`;
+                    document.querySelector('.score-display').appendChild(compEl);
+                }
+
                 loadHistory();
             } catch (e) {
                 console.error('Failed to save assessment:', e);
@@ -818,10 +855,13 @@
             }
         }
 
+        let phq9Chart = null, gad7Chart = null;
+
         function renderHistory(items) {
             const list = document.getElementById('history-list');
             if (!items.length) {
                 list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No assessments yet</p>';
+                document.getElementById('charts-section').style.display = 'none';
                 return;
             }
             
@@ -837,6 +877,68 @@
                     <div class="history-item-score">${item.total_score}</div>
                 </div>
             `).join('');
+
+            // Show charts section
+            document.getElementById('charts-section').style.display = 'grid';
+
+            const phq9Items = items.filter(i => i.assessment_type === 'phq9').slice(0, 7).reverse();
+            const gad7Items = items.filter(i => i.assessment_type === 'gad7').slice(0, 7).reverse();
+
+            renderChart('phq9-chart', 'phq9-empty', phq9Items, 'PHQ-9 Score', '#2D5A3D');
+            renderChart('gad7-chart', 'gad7-empty', gad7Items, 'GAD-7 Score', '#B8845A');
+        }
+
+        function renderChart(canvasId, emptyId, items, label, color) {
+            const canvas = document.getElementById(canvasId);
+            const emptyEl = document.getElementById(emptyId);
+            
+            if (!items.length) {
+                canvas.style.display = 'none';
+                if (emptyEl) emptyEl.style.display = 'block';
+                return;
+            }
+            canvas.style.display = 'block';
+            if (emptyEl) emptyEl.style.display = 'none';
+
+            // Destroy existing chart
+            if (canvasId === 'phq9-chart' && phq9Chart) phq9Chart.destroy();
+            if (canvasId === 'gad7-chart' && gad7Chart) gad7Chart.destroy();
+
+            const chart = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: items.map(i => new Date(i.created_at).toLocaleDateString()),
+                    datasets: [{
+                        label: label,
+                        data: items.map(i => i.total_score),
+                        borderColor: color,
+                        backgroundColor: color + '22',
+                        borderWidth: 2.5,
+                        pointBackgroundColor: color,
+                        pointRadius: 5,
+                        tension: 0.35,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(128,128,128,0.1)' },
+                            ticks: { color: '#888', font: { size: 11 } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#888', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+
+            if (canvasId === 'phq9-chart') phq9Chart = chart;
+            if (canvasId === 'gad7-chart') gad7Chart = chart;
         }
 
         // Load history on page load

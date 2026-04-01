@@ -1383,6 +1383,46 @@ def test_notification():
     })
 
 
+@app.route('/api/chat/journal', methods=['POST'])
+@handle_errors("Journal save endpoint")
+def save_journal():
+    """Save a journal entry"""
+    user_id = get_user_id()
+    data = request.get_json() or {}
+    entry = data.get('entry', '').strip()
+
+    if not entry:
+        return jsonify({'error': 'Entry is required'}), 400
+
+    try:
+        from database import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS journal_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                entry TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+
+        cursor.execute(
+            'INSERT INTO journal_entries (user_id, entry) VALUES (?, ?)',
+            (user_id, entry)
+        )
+        conn.commit()
+        conn.close()
+        logger.info(f"Journal entry saved for user {user_id}")
+        return jsonify({'success': True, 'message': 'Journal entry saved'})
+
+    except Exception as e:
+        logger.error(f"Failed to save journal entry: {e}")
+        return jsonify({'error': 'Failed to save entry'}), 500
+
+
 if __name__ == '__main__':
     logger.info("Starting Flask application on http://127.0.0.1:5000")
     logger.info("Phase 2 features enabled: Authentication, Sentiment Analysis, Notifications, API Docs")

@@ -2,7 +2,12 @@ import sqlite3
 from datetime import datetime
 import os
 
-DB_PATH = 'mental_health.db'
+# Use data directory for Docker volume mounting
+DB_DIR = 'data'
+DB_PATH = os.path.join(DB_DIR, 'mental_health.db')
+
+# Ensure data directory exists
+os.makedirs(DB_DIR, exist_ok=True)
 
 
 def get_db_connection():
@@ -325,6 +330,7 @@ def get_user_chat_sessions(user_id, limit=20):
     
     cursor.execute('''
         SELECT cs.id, cs.title, cs.created_at, cs.updated_at,
+               (SELECT COUNT(*) FROM conversations WHERE chat_session_id = cs.id) +
                (SELECT COUNT(*) FROM chat_history WHERE chat_session_id = cs.id) as message_count
         FROM chat_sessions cs
         WHERE cs.user_id = ?
@@ -366,8 +372,10 @@ def delete_chat_session(session_id, user_id):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Delete messages first
+    # Delete messages from both tables
     cursor.execute('DELETE FROM chat_history WHERE chat_session_id = ? AND user_id = ?', 
+                   (session_id, user_id))
+    cursor.execute('DELETE FROM conversations WHERE chat_session_id = ? AND user_id = ?',
                    (session_id, user_id))
     
     # Delete session
@@ -624,9 +632,11 @@ def delete_user(user_id):
     # Delete related data
     cursor.execute('DELETE FROM assessment_results WHERE user_id = ?', (user_id,))
     cursor.execute('DELETE FROM chat_history WHERE user_id = ?', (user_id,))
+    cursor.execute('DELETE FROM conversations WHERE user_id = ?', (user_id,))
     cursor.execute('DELETE FROM crisis_events WHERE user_id = ?', (user_id,))
     cursor.execute('DELETE FROM sentiment_history WHERE user_id = ?', (user_id,))
     cursor.execute('DELETE FROM user_preferences WHERE user_id = ?', (user_id,))
+    cursor.execute('DELETE FROM chat_sessions WHERE user_id = ?', (user_id,))
     cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
     
     conn.commit()

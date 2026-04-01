@@ -1,5 +1,5 @@
 /* ============================================
-   MindSpace - Main JavaScript
+   Serene - Main JavaScript
    ============================================ */
 
 // ==================== GLOBAL STATE ====================
@@ -174,9 +174,12 @@ function renderChatList() {
              onclick="loadChatSession(${session.id})">
             <div class="chat-item-content">
                 <div class="chat-item-title">${escapeHtml(session.title || 'New Chat')}</div>
-                <div class="chat-item-date">${formatRelativeTime(session.updated_at)}</div>
+                <div class="chat-item-meta">
+                    <span class="chat-item-date">${formatRelativeTime(session.updated_at)}</span>
+                    ${session.message_count ? `<span class="chat-item-count">${session.message_count} msgs</span>` : ''}
+                </div>
             </div>
-            <button class="chat-item-delete" onclick="event.stopPropagation(); deleteChatSession(${session.id})">
+            <button class="chat-item-delete" onclick="event.stopPropagation(); deleteChatSession(${session.id})" title="Delete">
                 🗑️
             </button>
         </div>
@@ -231,62 +234,6 @@ async function reloadCurrentChatMessages() {
     } catch (error) {
         console.error('Failed to reload messages:', error);
     }
-}
-
-function renderMessages(messages) {
-    const chatLog = document.getElementById('chat-log');
-    if (!chatLog) return;
-    
-    if (messages.length === 0) {
-        chatLog.innerHTML = `
-            <div class="welcome-message">
-                <h2 class="welcome-title">Welcome to Serene</h2>
-                <p class="welcome-subtitle">Your AI-powered mental health companion. Share your thoughts in a safe, supportive space.</p>
-                <div class="quick-actions">
-                    <button class="quick-btn" onclick="quickQuery('I\\'m feeling anxious')">😰 Feeling Anxious</button>
-                    <button class="quick-btn" onclick="quickQuery('I need coping strategies')">🧘 Coping Strategies</button>
-                    <button class="quick-btn" onclick="quickQuery('How can I improve my mood?')">😊 Mood Help</button>
-                </div>
-            </div>`;
-        return;
-    }
-    
-    // Handle both formats: {message, response} from DB and {role, content} from streaming
-    let html = '';
-    messages.forEach(msg => {
-        if (msg.message !== undefined && msg.response !== undefined) {
-            // Database format: {message, response}
-            html += `
-                <div class="chat-message user-message">
-                    <div class="message-wrapper">
-                        <div class="avatar user-avatar">👤</div>
-                        <div class="message-content">${escapeHtml(msg.message)}</div>
-                    </div>
-                </div>
-                <div class="chat-message bot-message">
-                    <div class="message-wrapper">
-                        <div class="avatar bot-avatar"><img src="/static/images/serene.png" alt="Serene" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"></div>
-                        <div class="message-content">${formatBotResponse(msg.response)}</div>
-                    </div>
-                </div>
-            `;
-        } else {
-            // Streaming format: {role, content}
-            const isUser = msg.role === 'user';
-            const avatarContent = isUser ? '👤' : '<img src="/static/images/serene.png" alt="Serene" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">';
-            html += `
-                <div class="chat-message ${isUser ? 'user-message' : 'bot-message'}">
-                    <div class="message-wrapper">
-                        <div class="avatar ${isUser ? 'user-avatar' : 'bot-avatar'}">${avatarContent}</div>
-                        <div class="message-content">${isUser ? escapeHtml(msg.content) : formatBotResponse(msg.content)}</div>
-                    </div>
-                </div>
-            `;
-        }
-    });
-    
-    chatLog.innerHTML = html;
-    scrollToBottom();
 }
 
 async function createNewChat() {
@@ -373,7 +320,8 @@ function sendMessage() {
     if (welcome) welcome.remove();
     
     // Add user message to UI
-    addMessageToUI(userQuery, true);
+    const userMsgDiv = addMessageToUI(userQuery, true);
+    addMessageEnhancements(userMsgDiv, userQuery, true);
     
     // Clear input
     input.value = '';
@@ -408,7 +356,7 @@ function addMessageToUI(content, isUser) {
     messageDiv.className = `chat-message ${isUser ? 'user-message' : 'bot-message'}`;
     const avatarContent = isUser ? '👤' : '<img src="/static/images/serene.png" alt="Serene" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">';
     messageDiv.innerHTML = `
-        <div class="message-wrapper">
+        <div class="message-wrapper" style="position:relative;">
             <div class="avatar ${isUser ? 'user-avatar' : 'bot-avatar'}">${avatarContent}</div>
             <div class="message-content">${isUser ? escapeHtml(content) : formatBotResponse(content)}</div>
         </div>
@@ -422,23 +370,26 @@ async function streamChatResponse(query) {
     const chatLog = document.getElementById('chat-log');
     const sendBtn = document.getElementById('send-button');
     
-    // Create streaming message container
-    const streamingId = 'streaming-' + Date.now();
-    const messageDiv = document.createElement('div');
-    messageDiv.id = streamingId;
-    messageDiv.className = 'chat-message bot-message';
-    messageDiv.innerHTML = `
+    // Show typing indicator with thinking ring on avatar
+    const typingId = 'typing-' + Date.now();
+    const typingDiv = document.createElement('div');
+    typingDiv.id = typingId;
+    typingDiv.className = 'chat-message bot-message';
+    typingDiv.innerHTML = `
         <div class="message-wrapper">
-            <div class="avatar bot-avatar"><img src="/static/images/serene.png" alt="Serene" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"></div>
+            <div class="avatar bot-avatar thinking"><img src="/static/images/serene.png" alt="Serene" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>
             <div class="message-content">
-                <span class="streaming-text"></span>
-                <span class="streaming-cursor">▋</span>
+                <div class="typing-indicator">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
             </div>
         </div>
     `;
-    chatLog.appendChild(messageDiv);
+    chatLog.appendChild(typingDiv);
     scrollToBottom();
-    
+
     // Disable send button
     sendBtn.disabled = true;
     sendBtn.textContent = '...';
@@ -459,7 +410,10 @@ async function streamChatResponse(query) {
         
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        const streamingText = messageDiv.querySelector('.streaming-text');
+
+        // Replace typing indicator with actual streaming message on first token
+        let streamingDiv = null;
+        let streamingText = null;
         
         while (true) {
             const { done, value } = await reader.read();
@@ -474,13 +428,30 @@ async function streamChatResponse(query) {
                         const data = JSON.parse(line.slice(6));
                         
                         if (data.type === 'token') {
+                            // On first token, replace typing indicator with streaming container
+                            if (!streamingDiv) {
+                                const typingEl = document.getElementById(typingId);
+                                if (typingEl) typingEl.remove();
+                                streamingDiv = document.createElement('div');
+                                streamingDiv.className = 'chat-message bot-message';
+                                streamingDiv.innerHTML = `
+                                    <div class="message-wrapper" style="position:relative;">
+                                        <div class="avatar bot-avatar"><img src="/static/images/serene.png" alt="Serene" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>
+                                        <div class="message-content">
+                                            <span class="streaming-text"></span>
+                                            <span class="streaming-cursor">▋</span>
+                                        </div>
+                                    </div>
+                                `;
+                                chatLog.appendChild(streamingDiv);
+                                streamingText = streamingDiv.querySelector('.streaming-text');
+                            }
                             fullResponse += data.content;
                             streamingText.innerHTML = formatBotResponse(fullResponse);
                             scrollToBottom();
                         } else if (data.type === 'done') {
-                            // Handle completion
-                            if (data.crisis_detected) {
-                                messageDiv.classList.add('crisis-alert');
+                            if (data.crisis_detected && streamingDiv) {
+                                streamingDiv.classList.add('crisis-alert');
                             }
                         }
                     } catch (e) {
@@ -490,20 +461,29 @@ async function streamChatResponse(query) {
             }
         }
         
-        // Remove cursor
-        const cursor = messageDiv.querySelector('.streaming-cursor');
-        if (cursor) cursor.remove();
+        // Remove cursor, add copy button and timestamp
+        if (streamingDiv) {
+            const cursor = streamingDiv.querySelector('.streaming-cursor');
+            if (cursor) cursor.remove();
+            addMessageEnhancements(streamingDiv, fullResponse, false);
+        } else {
+            // No tokens received — remove typing indicator
+            const typingEl = document.getElementById(typingId);
+            if (typingEl) typingEl.remove();
+        }
         
         // Auto-update title if first message
         autoUpdateChatTitle(query);
         
-        // Reload messages from backend to ensure they're saved properly
-        await reloadCurrentChatMessages();
+        // Reload sidebar to update message counts
+        loadChatSessions();
         
     } catch (error) {
         console.error('Streaming error:', error);
-        // Fallback to regular API
-        fallbackChatRequest(query, streamingId);
+        // Remove typing indicator and fallback
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+        fallbackChatRequest(query);
     }
     
     // Re-enable send button
@@ -511,7 +491,7 @@ async function streamChatResponse(query) {
     sendBtn.textContent = 'Send';
 }
 
-async function fallbackChatRequest(query, streamingId) {
+async function fallbackChatRequest(query) {
     try {
         const response = await fetch('/ask', {
             method: 'POST',
@@ -520,19 +500,17 @@ async function fallbackChatRequest(query, streamingId) {
         });
         
         const data = await response.json();
-        const messageDiv = document.getElementById(streamingId);
+        const msgDiv = addMessageToUI(data.response, false);
         
-        if (messageDiv) {
-            const content = messageDiv.querySelector('.message-content');
-            content.innerHTML = formatBotResponse(data.response);
+        if (msgDiv) {
+            addMessageEnhancements(msgDiv, data.response, false);
             
             if (data.crisis_detected) {
-                messageDiv.classList.add('crisis-alert');
+                msgDiv.classList.add('crisis-alert');
             }
         }
         
-        // Reload messages from backend
-        await reloadCurrentChatMessages();
+        loadChatSessions();
     } catch (error) {
         showToast('Failed to get response', 'error');
     }
@@ -565,6 +543,93 @@ function quickQuery(query) {
         input.value = query;
         sendMessage();
     }
+}
+
+// ==================== MESSAGE ENHANCEMENTS (copy + timestamp) ====================
+function addMessageEnhancements(msgDiv, text, isUser) {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Timestamp
+    const ts = document.createElement('div');
+    ts.className = 'message-timestamp';
+    ts.textContent = timeStr;
+    msgDiv.appendChild(ts);
+
+    // Copy button for bot messages only
+    if (!isUser) {
+        const wrapper = msgDiv.querySelector('.message-wrapper');
+        if (wrapper) {
+            wrapper.style.position = 'relative';
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'message-copy-btn';
+            copyBtn.title = 'Copy response';
+            copyBtn.innerHTML = '📋';
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(text).then(() => {
+                    copyBtn.innerHTML = '✅';
+                    setTimeout(() => { copyBtn.innerHTML = '📋'; }, 1500);
+                });
+            };
+            wrapper.appendChild(copyBtn);
+        }
+    }
+}
+
+// Also enhance messages when loaded from DB
+function renderMessages(messages) {
+    const chatLog = document.getElementById('chat-log');
+    if (!chatLog) return;
+    
+    if (messages.length === 0) {
+        chatLog.innerHTML = `
+            <div class="welcome-message">
+                <h2 class="welcome-title">Welcome to Serene</h2>
+                <p class="welcome-subtitle">Your AI-powered mental health companion. Share your thoughts in a safe, supportive space.</p>
+                <div class="quick-actions">
+                    <button class="quick-btn" onclick="quickQuery('I\\'m feeling anxious')">😰 Feeling Anxious</button>
+                    <button class="quick-btn" onclick="quickQuery('I need coping strategies')">🧘 Coping Strategies</button>
+                    <button class="quick-btn" onclick="quickQuery('How can I improve my mood?')">😊 Mood Help</button>
+                </div>
+            </div>`;
+        return;
+    }
+    
+    chatLog.innerHTML = '';
+    messages.forEach(msg => {
+        if (msg.message !== undefined && msg.response !== undefined) {
+            const userDiv = document.createElement('div');
+            userDiv.className = 'chat-message user-message';
+            userDiv.innerHTML = `<div class="message-wrapper"><div class="avatar user-avatar">👤</div><div class="message-content">${escapeHtml(msg.message)}</div></div>`;
+            chatLog.appendChild(userDiv);
+            addMessageEnhancements(userDiv, msg.message, true);
+
+            const botDiv = document.createElement('div');
+            botDiv.className = 'chat-message bot-message';
+            botDiv.innerHTML = `<div class="message-wrapper" style="position:relative;"><div class="avatar bot-avatar"><img src="/static/images/serene.png" alt="Serene" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div><div class="message-content">${formatBotResponse(msg.response)}</div></div>`;
+            chatLog.appendChild(botDiv);
+            addMessageEnhancements(botDiv, msg.response, false);
+        } else {
+            const isUser = msg.role === 'user';
+            const div = document.createElement('div');
+            div.className = `chat-message ${isUser ? 'user-message' : 'bot-message'}`;
+            const avatarContent = isUser ? '👤' : '<img src="/static/images/serene.png" alt="Serene" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+            div.innerHTML = `<div class="message-wrapper" style="position:relative;"><div class="avatar ${isUser ? 'user-avatar' : 'bot-avatar'}">${avatarContent}</div><div class="message-content">${isUser ? escapeHtml(msg.content) : formatBotResponse(msg.content)}</div></div>`;
+            chatLog.appendChild(div);
+            addMessageEnhancements(div, msg.content, isUser);
+        }
+    });
+    scrollToBottom();
+}
+
+// ==================== CHAT SEARCH ====================
+function filterChatSessions(query) {
+    const items = document.querySelectorAll('#chat-list .chat-item');
+    const q = query.toLowerCase().trim();
+    items.forEach(item => {
+        const title = item.querySelector('.chat-item-title')?.textContent?.toLowerCase() || '';
+        item.style.display = (!q || title.includes(q)) ? '' : 'none';
+    });
 }
 
 // ==================== MODAL MANAGEMENT ====================
@@ -613,14 +678,73 @@ document.addEventListener('click', (e) => {
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
-    return div.innerHTML;
+    return div.innerHTML.replace(/\n/g, '<br>');
 }
 
 function formatBotResponse(text) {
     if (!text) return '';
-    text = text.replace(/\n/g, '<br>');
-    text = text.replace(/(<br>){2,}/g, '</p><p>');
-    return `<p>${text}</p>`;
+
+    // Helper: escape a plain text segment to prevent XSS
+    function escapeHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    // Apply inline markdown (bold / italic) to an already-escaped string
+    function applyInline(str) {
+        // Bold: **text** or __text__
+        str = str.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        str = str.replace(/__(.+?)__/g, '<strong>$1</strong>');
+        // Italic: *text* or _text_  (single, not double)
+        str = str.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+        str = str.replace(/(?<!_)_(?!_)(.+?)(?<!_)_(?!_)/g, '<em>$1</em>');
+        return str;
+    }
+
+    const lines = text.split('\n');
+    let html = '';
+    let listType = null; // 'ul' | 'ol' | null
+
+    const closeList = () => {
+        if (listType) {
+            html += `</${listType}>`;
+            listType = null;
+        }
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+        const raw = lines[i];
+        const trimmed = raw.trim();
+
+        // Bullet: lines starting with "- " or "* "
+        const bulletMatch = trimmed.match(/^[-*]\s+(.+)/);
+        // Numbered: lines starting with "1. " "2. " etc.
+        const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)/);
+
+        if (bulletMatch) {
+            if (listType === 'ol') closeList();
+            if (listType !== 'ul') { html += '<ul>'; listType = 'ul'; }
+            html += `<li>${applyInline(escapeHtml(bulletMatch[1]))}</li>`;
+        } else if (numberedMatch) {
+            if (listType === 'ul') closeList();
+            if (listType !== 'ol') { html += '<ol>'; listType = 'ol'; }
+            html += `<li>${applyInline(escapeHtml(numberedMatch[2]))}</li>`;
+        } else {
+            closeList();
+            if (trimmed === '') {
+                // Blank line → spacing between paragraphs
+                if (html && !html.endsWith('<br>') && !html.endsWith('</p>')) {
+                    html += '<br>';
+                }
+            } else {
+                html += `<p>${applyInline(escapeHtml(trimmed))}</p>`;
+            }
+        }
+    }
+
+    closeList();
+    return html || '<p></p>';
 }
 
 function formatRelativeTime(dateStr) {
@@ -662,14 +786,24 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
-// Auto-resize textarea
+// Auto-resize textarea + character counter
 function setupTextareaAutoResize() {
     const textarea = document.getElementById('user-input');
+    const counter = document.getElementById('input-counter');
+    const MAX = 2000;
+
     if (textarea) {
-        textarea.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 150) + 'px';
-        });
+        const updateCounter = () => {
+            const len = textarea.value.length;
+            if (counter) {
+                counter.textContent = `${len} / ${MAX}`;
+                counter.className = 'input-counter' + (len > MAX * 0.9 ? ' warn' : '') + (len >= MAX ? ' limit' : '');
+            }
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
+        };
+
+        textarea.addEventListener('input', updateCounter);
         
         // Send on Enter (without Shift)
         textarea.addEventListener('keypress', function(e) {
@@ -756,6 +890,71 @@ async function loadDashboardData() {
         if (recentActivityEl) {
             recentActivityEl.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">Dashboard data will appear here once you start chatting! 🌊</p>';
         }
+    }
+
+    // Load mood chart regardless
+    loadMoodChart();
+}
+
+let moodChartInstance = null;
+async function loadMoodChart() {
+    try {
+        const res = await fetch('/api/analytics/mood-trend?days=7');
+        if (!res.ok) return;
+        const data = await res.json();
+        const trend = data.data || [];
+
+        const canvas = document.getElementById('mood-chart');
+        const emptyEl = document.getElementById('mood-chart-empty');
+        if (!canvas) return;
+
+        if (!trend.length) {
+            canvas.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = 'block';
+            return;
+        }
+        canvas.style.display = 'block';
+        if (emptyEl) emptyEl.style.display = 'none';
+
+        if (moodChartInstance) moodChartInstance.destroy();
+
+        const reversed = [...trend].reverse();
+        moodChartInstance = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: reversed.map(d => d.date),
+                datasets: [{
+                    label: 'Mood Score',
+                    data: reversed.map(d => d.avg_mood),
+                    borderColor: '#2D5A3D',
+                    backgroundColor: 'rgba(45,90,61,0.12)',
+                    borderWidth: 2.5,
+                    pointBackgroundColor: '#2D5A3D',
+                    pointRadius: 5,
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        min: -1, max: 1,
+                        grid: { color: 'rgba(128,128,128,0.1)' },
+                        ticks: { color: '#888', font: { size: 11 },
+                            callback: v => v > 0.3 ? '😊' : v < -0.3 ? '😔' : '😐'
+                        }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#888', font: { size: 10 } }
+                    }
+                }
+            }
+        });
+    } catch (e) {
+        console.error('Failed to load mood chart:', e);
     }
 }
 
@@ -923,13 +1122,26 @@ function openJournal() {
 
 function saveJournalEntry() {
     const entry = document.getElementById('journal-text').value.trim();
-    if (entry) {
-        // In a real app, this would save to the backend
-        showToast('✨ Journal entry saved! Keep writing to track your thoughts.', 'success');
+    if (!entry) { showToast('Please write something before saving.', 'info'); return; }
+
+    fetch('/api/chat/journal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entry, timestamp: new Date().toISOString() })
+    })
+    .then(res => res.ok ? res.json() : Promise.reject())
+    .then(() => {
+        showToast('✨ Journal entry saved!', 'success');
         closeModal('journal-modal');
-    } else {
-        showToast('Please write something before saving.', 'info');
-    }
+    })
+    .catch(() => {
+        // Fallback: store in localStorage if backend unavailable
+        const journals = JSON.parse(localStorage.getItem('journal_entries') || '[]');
+        journals.unshift({ entry, date: new Date().toLocaleDateString() });
+        localStorage.setItem('journal_entries', JSON.stringify(journals.slice(0, 50)));
+        showToast('✨ Journal entry saved locally!', 'success');
+        closeModal('journal-modal');
+    });
 }
 
 function showSleepTips() {
@@ -1016,9 +1228,26 @@ function changePassword() {
 }
 
 function deleteAccount() {
-    if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-        showToast('Account deletion functionality coming soon', 'info');
-    }
+    const password = prompt('To confirm account deletion, enter your password:');
+    if (!password) return;
+
+    if (!confirm('This will permanently delete your account and all data. This cannot be undone. Continue?')) return;
+
+    fetch('/api/auth/delete-account', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Account deleted. Redirecting...', 'success');
+            setTimeout(() => window.location.href = '/login', 1500);
+        } else {
+            showToast(data.message || 'Failed to delete account', 'error');
+        }
+    })
+    .catch(() => showToast('Failed to delete account', 'error'));
 }
 
 // Avatar customizer state
@@ -1209,7 +1438,7 @@ async function clearAllChats() {
             // Reload chat sessions
             await loadChatSessions();
             // Clear current chat
-            currentSessionId = null;
+            currentChatSessionId = null;
             const chatLog = document.getElementById('chat-log');
             if (chatLog) chatLog.innerHTML = '';
         } else {
