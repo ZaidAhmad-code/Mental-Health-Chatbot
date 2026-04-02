@@ -182,4 +182,4 @@ docker-compose up --build
 
 ---
 
-*Developed by Zaid Ahmad — BSc Computer Science with Artificial Intelligence, 2026*
+*Developed by PixelMindTechTeam — BSc Computer Science with Artificial Intelligence, 2026*
