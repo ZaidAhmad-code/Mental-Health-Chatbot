@@ -350,7 +350,7 @@ def init_sentiment_table():
     
     conn.commit()
     conn.close()
-    logger.info("✓ Sentiment table initialized")
+    logger.info("OK Sentiment table initialized")
 
 
 def save_sentiment_analysis(user_id: int, analysis: Dict, message_type: str = 'chat') -> int:

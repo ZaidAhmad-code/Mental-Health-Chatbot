@@ -79,6 +79,19 @@ print("=" * 60)
 
 groq_llm, gemini_llm = initialize_llm()
 
+# Pick a working primary LLM (prefer Groq, fallback to Gemini)
+primary_llm = groq_llm or gemini_llm
+secondary_llm = None
+if primary_llm is groq_llm and gemini_llm:
+    secondary_llm = gemini_llm
+elif primary_llm is gemini_llm and groq_llm:
+    secondary_llm = groq_llm
+
+if not primary_llm:
+    raise RuntimeError(
+        "No LLM is configured. Set GROQ_API_KEY and/or GEMINI_API_KEY in your environment (.env) and rerun."
+    )
+
 db_path = 'chroma_db'
 if not os.path.exists(db_path):
     vector_db = create_vector_db()
@@ -87,14 +100,14 @@ else:
     vector_db = Chroma(persist_directory=db_path, embedding_function=embeddings)
 
 # Create QA chains for both LLMs
-primary_chain = setup_qa_chain(vector_db, groq_llm)
-secondary_chain = setup_qa_chain(vector_db, gemini_llm) if gemini_llm else None
+primary_chain = setup_qa_chain(vector_db, primary_llm)
+secondary_chain = setup_qa_chain(vector_db, secondary_llm) if secondary_llm else None
 
 # Create dual LLM chain with automatic fallback
 qa_chain = DualLLMChain(primary_chain, secondary_chain)
 
 print("=" * 60)
-print("✓ Dual LLM Mental Health Chatbot Ready!")
+print("OK Dual LLM Mental Health Chatbot Ready!")
 print("=" * 60)
 
 
@@ -173,7 +186,7 @@ def ask():
     # Check cache first
     cached_response = get_cached_llm_response(user_query.lower().strip())
     if cached_response and not any(word in user_query.lower() for word in ['i', 'my', 'me']):
-        logger.info(f"✓ Cache hit for user {user_id}")
+        logger.info(f"OK Cache hit for user {user_id}")
         duration = (datetime.now() - start_time).total_seconds()
         ErrorHandler.log_response('/ask', user_id, 'success_cached', duration)
         
@@ -242,7 +255,7 @@ def ask():
     # Cache response for non-personal queries (less aggressive caching for mental health)
     if not any(word in user_query.lower() for word in ['i', 'my', 'me', 'myself', 'feel', 'feeling', 'am']):
         cache_llm_response(user_query.lower().strip(), response, ttl=1800)
-        logger.info(f"✓ Response cached for query: {user_query[:50]}...")
+        logger.info(f"OK Response cached for query: {user_query[:50]}...")
     
     duration = (datetime.now() - start_time).total_seconds()
     ErrorHandler.log_response('/ask', user_id, 'success', duration)

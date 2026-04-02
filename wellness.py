@@ -262,7 +262,7 @@ def init_wellness_tables():
     
     conn.commit()
     conn.close()
-    print("✓ Wellness tables initialized")
+    print("OK Wellness tables initialized")
 
 
 def save_wellness_session(user_id: str, session_type: str, exercise_id: str, 

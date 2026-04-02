@@ -170,7 +170,7 @@ def log_performance(func_name: str = None):
             try:
                 result = func(*args, **kwargs)
                 duration = (datetime.now() - start_time).total_seconds()
-                logger.info(f"✓ {name} completed in {duration:.3f}s")
+                logger.info(f"OK {name} completed in {duration:.3f}s")
                 return result
             
             except Exception as e:

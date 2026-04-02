@@ -166,7 +166,7 @@ def init_db():
     
     conn.commit()
     conn.close()
-    print("✓ Database initialized successfully")
+    print("OK Database initialized successfully")
 
 
 def save_assessment_result(user_id, assessment_type, score, severity, answers):

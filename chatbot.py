@@ -45,34 +45,42 @@ Give helpful, specific advice (be knowledgeable and direct, not preachy):"""
 
 def initialize_llm():
     """Initialize dual LLM system with Groq as primary and Gemini as fallback"""
-    try:
-        # Primary LLM: Groq (LLaMA-3.3 70B) with higher temperature for natural conversation
-        groq_llm = ChatGroq(
-            temperature=0.7,
-            groq_api_key=os.getenv("GROQ_API_KEY"),
-            model_name="llama-3.3-70b-versatile",
-            max_tokens=500  # Enough for helpful advice
-        )
-        print("✓ Primary LLM initialized: Groq (LLaMA-3.3 70B)")
-        
-        # Secondary LLM: Google Gemini Pro
-        gemini_api_key = os.getenv("GEMINI_API_KEY")
-        if gemini_api_key and gemini_api_key != "your_gemini_api_key_here":
+    groq_llm = None
+    gemini_llm = None
+
+    # Primary LLM: Groq (LLaMA-3.3 70B)
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if groq_api_key and groq_api_key.strip() and groq_api_key != "your_groq_api_key_here":
+        try:
+            groq_llm = ChatGroq(
+                temperature=0.7,
+                groq_api_key=groq_api_key,
+                model_name="llama-3.3-70b-versatile",
+                max_tokens=500,  # Enough for helpful advice
+            )
+            print("OK Primary LLM initialized: Groq (LLaMA-3.3 70B)")
+        except Exception as e:
+            print(f"WARN Failed to initialize Groq LLM: {e}")
+    else:
+        print("WARN GROQ_API_KEY not configured - Groq disabled")
+
+    # Secondary LLM: Google Gemini Pro
+    gemini_api_key = os.getenv("GEMINI_API_KEY")
+    if gemini_api_key and gemini_api_key.strip() and gemini_api_key != "your_gemini_api_key_here":
+        try:
             gemini_llm = ChatGoogleGenerativeAI(
                 model="gemini-pro",
                 google_api_key=gemini_api_key,
                 temperature=0.7,
-                max_output_tokens=500
+                max_output_tokens=500,
             )
-            print("✓ Secondary LLM initialized: Google Gemini Pro")
-        else:
-            gemini_llm = None
-            print("⚠ Gemini API key not configured - running with Groq only")
-        
-        return groq_llm, gemini_llm
-    except Exception as e:
-        print(f"✗ Error initializing LLMs: {e}")
-        return None, None
+            print("OK Secondary LLM initialized: Google Gemini Pro")
+        except Exception as e:
+            print(f"WARN Failed to initialize Gemini LLM: {e}")
+    else:
+        print("WARN GEMINI_API_KEY not configured - Gemini disabled")
+
+    return groq_llm, gemini_llm
 
 
 class DualLLMChain:
@@ -105,17 +113,17 @@ NOW RESPONDING TO: {query}"""
             self.primary_failures = 0  # Reset failure counter on success
             return self._clean_response(response)
         except Exception as primary_error:
-            print(f"⚠ Primary LLM (Groq) failed: {primary_error}")
+            print(f"WARN Primary LLM (Groq) failed: {primary_error}")
             self.primary_failures += 1
             
             # Fallback to secondary LLM (Gemini)
             if self.secondary_chain:
                 try:
-                    print("→ Switching to secondary LLM (Gemini)...")
+                    print("INFO Switching to secondary LLM (Gemini)...")
                     response = self.secondary_chain.run(full_query)
                     return self._clean_response(response)
                 except Exception as secondary_error:
-                    print(f"✗ Secondary LLM (Gemini) also failed: {secondary_error}")
+                    print(f"ERROR Secondary LLM (Gemini) also failed: {secondary_error}")
                     return self._get_fallback_response()
             else:
                 return self._get_fallback_response()
@@ -194,7 +202,7 @@ def main():
     groq_llm, gemini_llm = initialize_llm()
     
     if not groq_llm:
-        print("✗ Failed to initialize LLMs. Exiting.")
+        print("ERROR Failed to initialize LLMs. Exiting.")
         return
 
     # Setup vector database
@@ -213,7 +221,7 @@ def main():
     
     # Create dual LLM chain with automatic fallback
     qa_chain = DualLLMChain(primary_chain, secondary_chain)
-    print("✓ Dual LLM system ready!")
+    print("OK Dual LLM system ready!")
     print("=" * 60)
     print("\nChat with the Mental Health Assistant (type 'exit' to quit)\n")
 

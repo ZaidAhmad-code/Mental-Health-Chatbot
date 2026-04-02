@@ -110,7 +110,7 @@ def init_auth_tables():
     
     conn.commit()
     conn.close()
-    logger.info("✓ Authentication tables initialized")
+    logger.info("OK Authentication tables initialized")
 
 
 def create_user(username: str, email: str, password: str, 
