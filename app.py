@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, session, Response, redirect, url_for
+from flask_cors import CORS
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_classic.chains import RetrievalQA
@@ -47,7 +48,13 @@ from wellness import (get_breathing_exercises, get_meditation_sessions, get_exer
                       init_wellness_tables)
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'mindspace-fallback-secret-key')
+CORS(app, 
+     supports_credentials=True, 
+     origins=["http://localhost:3000"],
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
+app.secret_key = 'your-secret-key-change-this-in-production'  # Change this!
 
 # Register API documentation blueprint
 app.register_blueprint(api_docs_bp, url_prefix='/api/docs')
@@ -93,8 +100,9 @@ print("=" * 60)
 
 def get_user_id():
     """Get or create user ID for session"""
-    if 'user_id' not in session:
-        session['user_id'] = create_guest_user()
+    if 'user_id' in session:
+        return session['user_id']
+    session['user_id'] = create_guest_user()
     return session['user_id']
 
 
@@ -715,8 +723,7 @@ def analytics_mood_trend():
 @handle_errors("Streaming chat endpoint")
 def stream_chat():
     """Stream chat response using Server-Sent Events with crisis detection"""
-    import json
-    
+    import json    
     user_id = get_user_id()
     data = request.get_json() or {}
     query = data.get('query', '').strip()
@@ -764,34 +771,44 @@ def stream_chat():
                         yield chunk
             
             # Save conversation to database
-            try:
-                if chat_session_id:
+            actual_session_id = chat_session_id 
+            try:               
+
                     from database import get_db_connection
                     conn = get_db_connection()
                     cursor = conn.cursor()
                     
                     # Update sentiment analysis
                     sentiment = sentiment_analyzer.analyze(query) if hasattr(sentiment_analyzer, 'analyze') else None
-                    
+                   
+                    if not actual_session_id:
+                        auto_title = query[:40].strip() + ("…" if len(query) > 40 else "")
+                        cursor.execute(
+                            "INSERT INTO chat_sessions (user_id, title, created_at, updated_at) VALUES (?, ?, datetime('now'), datetime('now'))",
+                            (user_id, auto_title)
+                        )
+                        actual_session_id = cursor.lastrowid
                     cursor.execute("""
                         INSERT INTO conversations (user_id, message, response, chat_session_id, sentiment_score, sentiment_label)
                         VALUES (?, ?, ?, ?, ?, ?)
                     """, (
-                        user_id, query, full_response, chat_session_id,
+                        user_id, query, full_response, actual_session_id,
                         sentiment.get('score') if sentiment else 0,
                         sentiment.get('label') if sentiment else 'neutral'
                     ))
                     
                     # Update session timestamp
-                    cursor.execute("UPDATE chat_sessions SET updated_at = datetime('now') WHERE id = ?", (chat_session_id,))
+                    cursor.execute("UPDATE chat_sessions SET updated_at = datetime('now') WHERE id = ?", (actual_session_id,))
                     conn.commit()
                     conn.close()
             except Exception as e:
                 logger.error(f"Failed to save streaming conversation: {e}")
+                
             
             # Send final done message with crisis info
             done_data = {
                 'type': 'done',
+                'session_id': actual_session_id, 
                 'crisis_detected': crisis_info['is_crisis'],
                 'crisis_level': crisis_info.get('severity'),
                 'crisis_resources': crisis_detector.get_crisis_resources() if crisis_info['is_crisis'] else None,
@@ -1374,46 +1391,6 @@ def test_notification():
         'message': 'Notification system ready (configure SMTP for actual emails)',
         'email': user['email']
     })
-
-
-@app.route('/api/chat/journal', methods=['POST'])
-@handle_errors("Journal save endpoint")
-def save_journal():
-    """Save a journal entry"""
-    user_id = get_user_id()
-    data = request.get_json() or {}
-    entry = data.get('entry', '').strip()
-
-    if not entry:
-        return jsonify({'error': 'Entry is required'}), 400
-
-    try:
-        from database import get_db_connection
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS journal_entries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                entry TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        ''')
-
-        cursor.execute(
-            'INSERT INTO journal_entries (user_id, entry) VALUES (?, ?)',
-            (user_id, entry)
-        )
-        conn.commit()
-        conn.close()
-        logger.info(f"Journal entry saved for user {user_id}")
-        return jsonify({'success': True, 'message': 'Journal entry saved'})
-
-    except Exception as e:
-        logger.error(f"Failed to save journal entry: {e}")
-        return jsonify({'error': 'Failed to save entry'}), 500
 
 
 if __name__ == '__main__':
