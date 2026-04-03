@@ -17,6 +17,8 @@ from threading import Thread
 from dotenv import load_dotenv
 load_dotenv()
 
+from prompts import build_prompt
+
 
 class StreamingCallbackHandler(BaseCallbackHandler):
     """Callback handler for streaming LLM responses"""
@@ -41,50 +43,53 @@ class StreamingCallbackHandler(BaseCallbackHandler):
 
 
 class StreamingLLMChain:
-    """Streaming LLM chain with real-time token output"""
-    
+    """Streaming LLM chain — Groq primary, Gemini 2.5 Flash fallback"""
+
     def __init__(self):
         self.groq_api_key = os.getenv("GROQ_API_KEY")
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
-    
-    def create_streaming_llm(self, callback_handler: StreamingCallbackHandler):
-        """Create a streaming-enabled LLM"""
+
+    def create_groq_llm(self, callback_handler: StreamingCallbackHandler, max_tokens: int = 300):
+        """Create a streaming-enabled Groq LLM"""
         return ChatGroq(
             temperature=0.7,
             groq_api_key=self.groq_api_key,
             model_name="llama-3.3-70b-versatile",
-            max_tokens=500,
+            max_tokens=max_tokens,
             streaming=True,
             callbacks=[callback_handler]
         )
-    
-    def stream_response(self, query: str, context: str = "") -> Generator[str, None, None]:
-        """Stream response tokens as they're generated"""
+
+    def create_gemini_llm(self, callback_handler: StreamingCallbackHandler, max_tokens: int = 300):
+        """Create a streaming-enabled Gemini 2.5 Flash LLM"""
+        return ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            google_api_key=self.gemini_api_key,
+            temperature=0.7,
+            max_output_tokens=max_tokens,
+            streaming=True,
+            callbacks=[callback_handler]
+        )
+
+    def _stream_with_llm(self, llm_factory, prompt: str) -> Generator[str, None, None]:
+        """Run a given LLM factory and stream its tokens via a queue."""
         queue = Queue()
         callback_handler = StreamingCallbackHandler(queue)
-        
-        # Create streaming LLM
-        llm = self.create_streaming_llm(callback_handler)
-        
-        # Build the prompt
-        prompt = self._build_prompt(query, context)
-        
-        # Start LLM in a separate thread
+        llm = llm_factory(callback_handler)
+
         def run_llm():
             try:
                 llm.invoke(prompt)
             except Exception as e:
                 queue.put({"type": "error", "content": str(e)})
-        
+
         thread = Thread(target=run_llm)
         thread.start()
-        
-        # Yield tokens as they come in
+
         full_response = ""
         while True:
             try:
-                item = queue.get(timeout=30)  # 30 second timeout
-                
+                item = queue.get(timeout=30)
                 if item["type"] == "token":
                     full_response += item["content"]
                     yield f"data: {json.dumps({'type': 'token', 'content': item['content']})}\n\n"
@@ -92,32 +97,47 @@ class StreamingLLMChain:
                     yield f"data: {json.dumps({'type': 'done', 'full_response': full_response})}\n\n"
                     break
                 elif item["type"] == "error":
-                    yield f"data: {json.dumps({'type': 'error', 'message': item['content']})}\n\n"
-                    break
-            except:
+                    raise RuntimeError(item["content"])
+            except RuntimeError:
+                raise
+            except Exception:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Timeout'})}\n\n"
                 break
-        
+
         thread.join(timeout=1)
+
+    def stream_response(self, query: str, context: str = "") -> Generator[str, None, None]:
+        """Stream response — try Groq first, fall back to Gemini on any error."""
+        prompt, max_tokens = build_prompt(query, context)
+
+        groq_factory  = lambda cb: self.create_groq_llm(cb, max_tokens)
+        gemini_factory = lambda cb: self.create_gemini_llm(cb, max_tokens)
+
+        # ── Try Groq (primary) ────────────────────────────────────────────────
+        groq_error = None
+        try:
+            for chunk in self._stream_with_llm(groq_factory, prompt):
+                if '"type": "error"' in chunk:
+                    groq_error = chunk
+                    break
+                yield chunk
+            if not groq_error:
+                return
+        except Exception as e:
+            groq_error = str(e)
+
+        # ── Groq failed — fall back to Gemini ────────────────────────────────
+        print(f"⚠ Groq streaming failed ({groq_error}), falling back to Gemini…")
+
+        if not self.gemini_api_key:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(groq_error)})}\n\n"
+            return
+
+        try:
+            yield from self._stream_with_llm(gemini_factory, prompt)
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
     
-    def _build_prompt(self, query: str, context: str) -> str:
-        """Build the mental health prompt"""
-        base_prompt = """You're a knowledgeable mental health companion. Give REAL, SPECIFIC, USEFUL advice - not generic fluff.
-
-Be direct and helpful, like a smart friend who knows their stuff. Give specific, actionable tips.
-
-{context}
-
-User said: {query}
-
-Give helpful, specific advice (be knowledgeable and direct, not preachy):"""
-        
-        return base_prompt.format(
-            context=f"Context: {context}" if context else "",
-            query=query
-        )
-
-
 def create_sse_response(generator: Generator) -> Response:
     """Create a Server-Sent Events response"""
     return Response(

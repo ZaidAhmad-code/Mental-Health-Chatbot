@@ -11,36 +11,28 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
+from prompts import build_prompt, classify_message
 
-# ========== ENHANCED MENTAL HEALTH PROMPT ==========
-MENTAL_HEALTH_PROMPT = """You're a knowledgeable mental health companion. Give REAL, SPECIFIC, USEFUL advice - not generic fluff.
 
-BANNED PHRASES (never say these):
-- "try deep breathing"
-- "practice meditation" 
-- "take time for self-care"
-- "focus on your breath"
-- "I recommend relaxation"
+# ========== MENTAL HEALTH PROMPT (used by RAG QA chain) ==========
+MENTAL_HEALTH_PROMPT = """You are Serene, a warm and knowledgeable mental health companion.
+Speak like a caring, emotionally intelligent friend — not a therapist reciting a textbook.
+Never use clinical jargon. Never give a wall of bullet points unprompted.
+Never say: "try deep breathing", "practice self-care", or "I'm just an AI".
 
-WHAT TO DO INSTEAD:
-- Give SPECIFIC, ACTIONABLE tips they can actually use
-- Use the knowledge from the mental health resources below
-- Be direct and helpful, like a smart friend who knows their stuff
-- It's okay to give real advice - that's what they're asking for!
-
-EXAMPLES:
-User: "advice for anxiety"
-GOOD: "A few things that actually work: the 5-4-3-2-1 grounding technique - name 5 things you see, 4 you hear, 3 you can touch, 2 you smell, 1 you taste. It pulls your brain out of the anxiety spiral. Also, cold water on your wrists or face triggers your dive reflex and slows your heart rate. What kind of anxiety are you dealing with - social, general worry, panic attacks?"
-
-User: "how to deal with depression"
-GOOD: "The hardest part is that depression kills motivation to do the things that help. Start stupid small - like just getting outside for 2 minutes, not a 30 min walk. Behavioral activation is the idea - doing stuff even when you don't feel like it, because mood follows action, not the other way around. Are you dealing with low energy, negative thoughts, or both?"
+Rules:
+- Match the length of your reply to the weight of what the user said
+- A short message deserves a short reply — don't pad it
+- Acknowledge feelings before giving advice
+- Be specific and actionable, not vague
+- Ask a follow-up question when appropriate
 
 Use this knowledge:
 {context}
 
 User said: {question}
 
-Give helpful, specific advice (be knowledgeable and direct, not preachy):"""
+Serene:"""
 
 
 def initialize_llm():
@@ -55,16 +47,16 @@ def initialize_llm():
         )
         print("✓ Primary LLM initialized: Groq (LLaMA-3.3 70B)")
         
-        # Secondary LLM: Google Gemini Pro
+        # Secondary LLM: Google Gemini 2.5 Flash
         gemini_api_key = os.getenv("GEMINI_API_KEY")
         if gemini_api_key and gemini_api_key != "your_gemini_api_key_here":
             gemini_llm = ChatGoogleGenerativeAI(
-                model="gemini-pro",
+                model="gemini-2.5-flash",
                 google_api_key=gemini_api_key,
                 temperature=0.7,
                 max_output_tokens=500
             )
-            print("✓ Secondary LLM initialized: Google Gemini Pro")
+            print("✓ Secondary LLM initialized: Google Gemini 2.5 Flash")
         else:
             gemini_llm = None
             print("⚠ Gemini API key not configured - running with Groq only")
