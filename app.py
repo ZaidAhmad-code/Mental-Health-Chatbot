@@ -1394,7 +1394,11 @@ def test_notification():
 
 
 if __name__ == '__main__':
-    logger.info("Starting Flask application on http://127.0.0.1:5000")
+    import socket
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    logger.info(f"Starting Flask application on http://0.0.0.0:5000")
+    logger.info(f"Local network access: http://{local_ip}:5000")
     logger.info("Phase 2 features enabled: Authentication, Sentiment Analysis, Notifications, API Docs")
     logger.info("API Documentation available at: http://127.0.0.1:5000/api/docs/")
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
