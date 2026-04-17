@@ -1,40 +1,100 @@
-# 🌿 Serene - AI Mental Health Chatbot
+# 🌿 Serene — AI Mental Health Companion
 
-> An AI-powered mental health assistant built with Flask, LangChain, and a dual LLM architecture. Designed as a university project for BSc Computer Science with Artificial Intelligence.
+> A full-stack, three-platform AI mental health companion built with Flask, LangChain, Next.js, and Flutter. Features a dual-LLM architecture with automatic fallback, Retrieval-Augmented Generation grounded in clinical literature, real-time crisis detection, and validated clinical screening tools (PHQ-9 & GAD-7).
+>
+> *BSc Computer Science with Artificial Intelligence — Final Year Project, 2026*
 
 ---
 
 ## 📋 Table of Contents
 
 - [Overview](#overview)
+- [System Architecture](#system-architecture)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Setup & Installation](#setup--installation)
-- [Usage](#usage)
+- [Running the System](#running-the-system)
 - [API Endpoints](#api-endpoints)
+- [Safety & Crisis Detection](#safety--crisis-detection)
+- [Clinical Assessments](#clinical-assessments)
 - [Disclaimer](#disclaimer)
 
 ---
 
 ## Overview
 
-**Serene** is a context-aware mental health chatbot that uses Retrieval-Augmented Generation (RAG) to provide grounded, evidence-based responses from curated mental health literature. It includes clinical screening tools (PHQ-9 & GAD-7), real-time crisis detection, user authentication, sentiment analysis, and wellness exercises.
+**Serene** is a context-aware mental health companion that uses Retrieval-Augmented Generation (RAG) to provide grounded, evidence-based responses from curated clinical mental health literature. It combines a conversational AI with real clinical screening tools, a real-time safety engine, mood tracking, and wellness exercises — accessible on both web and Android.
+
+The system is built across three platforms:
+- **Flask backend** — the core API, AI pipeline, and database
+- **Next.js web app** — browser-based interface with real-time streaming chat
+- **Flutter Android app** — native mobile client with full feature parity
+
+---
+
+## System Architecture
+
+```
+┌─────────────────────┐     ┌─────────────────────┐
+│   Next.js Web App   │     │  Flutter Android App │
+│   (port 3000)       │     │  (serene_app/)       │
+└────────┬────────────┘     └──────────┬───────────┘
+         │  HTTP / SSE                 │  HTTP / SSE
+         ▼                             ▼
+┌─────────────────────────────────────────────────┐
+│              Flask Backend (port 5000)           │
+│                                                  │
+│  ┌──────────┐  ┌───────────┐  ┌──────────────┐  │
+│  │  Auth &  │  │    RAG    │  │    Crisis    │  │
+│  │ Sessions │  │ Pipeline  │  │  Detection   │  │
+│  └──────────┘  └─────┬─────┘  └──────────────┘  │
+│                      │                           │
+│  ┌───────────────────▼──────────────────────┐   │
+│  │          Dual LLM Architecture           │   │
+│  │  Primary: Groq LLaMA-3.3 70B            │   │
+│  │  Fallback: Google Gemini 2.5 Flash      │   │
+│  └──────────────────────────────────────────┘   │
+│                                                  │
+│  ┌─────────────┐  ┌───────────┐  ┌──────────┐   │
+│  │  ChromaDB   │  │  SQLite   │  │Sentiment │   │
+│  │ Vector Store│  │    DB     │  │ Analysis │   │
+│  └─────────────┘  └───────────┘  └──────────┘   │
+└─────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Features
 
-- 🤖 **Dual LLM Architecture** — Primary: Groq (LLaMA-3.3 70B), Fallback: Google Gemini Pro
-- 📚 **RAG Pipeline** — Responses grounded in mental health PDFs via ChromaDB vector store
-- 🏥 **Clinical Assessments** — PHQ-9 (depression) and GAD-7 (anxiety) with scored results
-- 🚨 **Crisis Detection** — Real-time keyword-based detection with resource links
-- 🔐 **User Authentication** — Register, login, session management
-- 💬 **Multi-Session Chat** — Multiple named chat sessions with full history
-- 📊 **Sentiment Analysis** — Per-message emotion and mood tracking
-- 🧘 **Wellness Module** — Breathing exercises and meditation sessions
-- 📈 **Analytics** — User stats, mood trends, assessment history
-- 🔒 **Error Handling & Logging** — Rotating logs, structured error tracking
+### 🤖 AI & Chat
+- **Dual LLM Architecture** — Primary: Groq LLaMA-3.3 70B · Fallback: Google Gemini 2.5 Flash (automatic, transparent)
+- **RAG Pipeline** — Responses grounded in 4 clinical mental health PDFs via ChromaDB + `all-MiniLM-L6-v2` embeddings
+- **Context-Aware Prompting** — 8 message types (greeting, venting, crisis, question, etc.) each with a dedicated system prompt and token budget
+- **Real-Time Streaming** — Server-Sent Events (SSE) for live token-by-token chat responses
+- **Multi-Session Memory** — Multiple named chat sessions, full history, per-session conversation context
+
+### 🚨 Safety
+- **Crisis Detection Engine** — 4 severity levels (NORMAL / MODERATE / HIGH / CRITICAL) with emergency resource surfacing
+- **Assessment-Integrated Safety** — PHQ-9 score ≥ 20 automatically triggers CRITICAL crisis flag
+
+### 🏥 Clinical Tools
+- **PHQ-9** — 9-question depression screening, 0–27 score, 5 severity bands
+- **GAD-7** — 7-question anxiety screening, 0–21 score, 4 severity bands
+- **Assessment History** — All results stored and displayed on dashboard
+
+### 📊 Wellbeing Tracking
+- **Sentiment Analysis** — Per-message mood scoring stored longitudinally
+- **Dashboard** — Mood trend graphs, usage stats, assessment history
+- **Predictive Analytics** — Risk scoring and mood forecasting
+- **Wellness Module** — Breathing, meditation, grounding, and journaling exercises
+
+### 🔐 Infrastructure
+- **User Authentication** — Register, login, session management with Werkzeug password hashing
+- **Response Caching** — In-memory cache for common queries (instant responses, no LLM call)
+- **Structured Logging** — Rotating logs, per-module error tracking
+- **OpenAPI Docs** — Swagger UI at `/api/docs/`
+- **Docker Support** — `Dockerfile` + `docker-compose.yml` included
 
 ---
 
@@ -43,46 +103,53 @@
 | Layer | Technology |
 |---|---|
 | Backend | Python 3.10, Flask 3.1 |
-| AI / LLM | LangChain, Groq (LLaMA-3.3 70B), Google Gemini Pro |
-| Vector DB | ChromaDB |
-| Embeddings | HuggingFace `all-MiniLM-L6-v2` |
+| LLM Orchestration | LangChain |
+| Primary LLM | Groq — LLaMA-3.3 70B |
+| Fallback LLM | Google Gemini 2.5 Flash |
+| Vector Database | ChromaDB |
+| Embeddings | HuggingFace `sentence-transformers/all-MiniLM-L6-v2` (384-dim) |
 | Database | SQLite |
-| Frontend | HTML, CSS, JavaScript (Vanilla) |
+| Web Frontend | Next.js (React), TypeScript |
+| Mobile App | Flutter (Dart), Android |
+| Streaming | Server-Sent Events (SSE) |
+| Auth | Flask Sessions, Werkzeug |
+| Containerisation | Docker, Docker Compose |
 
 ---
 
 ## Project Structure
 
 ```
-Serene/
-├── app.py                   # Main Flask application & all API routes
-├── chatbot.py               # Dual LLM chain & RAG setup
-├── database.py              # SQLite database models & queries
-├── auth.py                  # User registration, login, session management
-├── assessments.py           # PHQ-9 & GAD-7 clinical assessment logic
-├── crisis_detection.py      # Keyword-based crisis detection
-├── sentiment_analysis.py    # Emotion & mood analysis
-├── analytics.py             # User stats & engagement metrics
-├── predictive_analytics.py  # Risk prediction & mood forecasting
-├── conversation_memory.py   # Per-user conversation context
-├── cache_manager.py         # In-memory LLM response cache
-├── wellness.py              # Breathing & meditation exercises
-├── notifications.py         # Email notification service
-├── streaming.py             # Server-Sent Events streaming
-├── websocket_chat.py        # WebSocket support (Flask-SocketIO)
-├── error_handler.py         # Logging & error handling
-├── api_docs.py              # OpenAPI / Swagger documentation
-├── templates/               # HTML templates
-│   ├── index.html           # Main chat UI
-│   ├── auth.html            # Login & register
-│   ├── assessments.html     # Clinical assessments
-│   └── dashboard.html       # User dashboard
-├── static/                  # CSS, JS, images
-├── data/                    # Mental health PDFs (RAG source)
-├── chroma_db/               # ChromaDB vector store (auto-generated)
-├── logs/                    # Application logs (auto-generated)
+Mental-Health-Chatbot/          ← Flask backend
+├── app.py                      # Entry point — all 30+ API routes
+├── chatbot.py                  # RAG chain, dual LLM initialisation
+├── streaming.py                # SSE streaming with Groq→Gemini fallback
+├── prompts.py                  # Context-aware message classifier & prompt builder
+├── database.py                 # SQLite schema & queries
+├── auth.py                     # Registration, login, session management
+├── assessments.py              # PHQ-9 & GAD-7 scoring logic
+├── crisis_detection.py         # 4-level crisis detection engine
+├── sentiment_analysis.py       # Per-message emotion scoring
+├── analytics.py                # Usage stats & mood trend aggregation
+├── predictive_analytics.py     # Risk scoring & mood forecasting
+├── conversation_memory.py      # Per-session conversation history
+├── cache_manager.py            # In-memory LLM response cache
+├── wellness.py                 # Wellness exercise content
+├── notifications.py            # Email notification service
+├── error_handler.py            # Logging & structured error handling
+├── api_docs.py                 # OpenAPI / Swagger docs
+├── websocket_chat.py           # WebSocket support (Flask-SocketIO)
+├── data/                       # Clinical PDFs (RAG knowledge base)
+│   ├── depression-in-adults-treatment-and-management.pdf
+│   ├── mental_health_Document.pdf
+│   ├── mhgap1.pdf
+│   └── The-Anxiety-and-Phobia-Workbook-Edmund-J.-Bourne.pdf
+├── chroma_db/                  # ChromaDB vector store (auto-generated)
+├── logs/                       # Application logs (auto-generated)
+├── templates/                  # Flask HTML templates (legacy)
+├── static/                     # Static assets
 ├── requirements.txt
-├── .env                     # API keys (not committed to git)
+├── .env                        # API keys — NOT committed
 ├── Dockerfile
 └── docker-compose.yml
 ```
@@ -94,8 +161,12 @@ Serene/
 ### Prerequisites
 
 - Python 3.10+
-- A [Groq API key](https://console.groq.com/) (free)
-- Optionally a [Google Gemini API key](https://aistudio.google.com/)
+- A [Groq API key](https://console.groq.com/) — free tier available
+- A [Google Gemini API key](https://aistudio.google.com/) — free tier available (used as fallback)
+- Node.js 18+ and `pnpm` (for the Next.js web frontend)
+- Flutter SDK (for the Android app — optional)
+
+---
 
 ### 1. Clone the repository
 
@@ -104,14 +175,14 @@ git clone https://github.com/ZaidAhmad-code/Mental-Health-Chatbot.git
 cd Mental-Health-Chatbot
 ```
 
-### 2. Create a virtual environment
+### 2. Create and activate a virtual environment
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate   # On Windows: .venv\Scripts\activate
+python3.10 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 ```
 
-### 3. Install dependencies
+### 3. Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -123,21 +194,52 @@ Create a `.env` file in the project root:
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
-GEMINI_API_KEY=your_gemini_api_key_here   # Optional
-SECRET_KEY=your_secret_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+SECRET_KEY=any_long_random_string_here
 ```
 
-### 5. Run the application
+---
+
+## Running the System
+
+### Backend (Flask)
 
 ```bash
+source .venv/bin/activate
 python app.py
 ```
 
-Visit **http://localhost:5000** in your browser.
+The backend starts on **http://0.0.0.0:5000** and is accessible from any device on the same network.
 
-> On first run, the vector database is built automatically from the PDFs in the `data/` folder. This may take a minute.
+> **First run:** The vector database is built automatically from the PDFs in `data/`. This takes ~1–2 minutes. Subsequent starts are instant.
 
-### Docker (Alternative)
+---
+
+### Web Frontend (Next.js)
+
+```bash
+cd ../Serene-Frontend
+pnpm install
+pnpm dev
+```
+
+Visit **http://localhost:3000**
+
+---
+
+### Android App (Flutter)
+
+```bash
+cd ../serene_app
+flutter pub get
+flutter run
+```
+
+On first launch, enter the backend IP address (e.g. `http://10.1.1.187:5000` on a local network, or `http://10.0.2.2:5000` for an Android emulator).
+
+---
+
+### Docker (All-in-one)
 
 ```bash
 docker-compose up --build
@@ -145,41 +247,103 @@ docker-compose up --build
 
 ---
 
-## Usage
-
-1. **Register** an account or log in.
-2. **Chat** with Serene about anything mental-health related.
-3. **Take assessments** (PHQ-9 / GAD-7) via the Assessments page.
-4. **Track your mood** and view history on the Dashboard.
-5. **Try wellness exercises** — breathing and meditation sessions.
-
----
-
 ## API Endpoints
 
+### Authentication
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/ask` | Send a chat message |
 | POST | `/api/auth/register` | Register a new user |
 | POST | `/api/auth/login` | Login |
 | POST | `/api/auth/logout` | Logout |
-| GET/PUT | `/api/auth/profile` | Get or update profile |
-| GET/POST | `/api/assessment/phq9` | PHQ-9 assessment |
-| GET/POST | `/api/assessment/gad7` | GAD-7 assessment |
-| GET | `/api/assessment/history` | Assessment history |
-| GET | `/api/analytics/user-stats` | User statistics |
-| GET | `/api/analytics/mood-trend` | Mood trend data |
+| GET/PUT | `/api/auth/profile` | Get or update user profile |
+| PUT | `/api/auth/change-password` | Change password |
+| DELETE | `/api/auth/delete-account` | Delete account |
+
+### Chat
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/ask` | Standard chat (non-streaming) |
+| GET | `/api/chat/stream` | SSE streaming chat |
+| GET | `/api/chats` | List all chat sessions |
+| POST | `/api/chats` | Create a new chat session |
+| GET | `/api/chats/<id>/messages` | Get messages for a session |
+| DELETE | `/api/chats/<id>` | Delete a session |
+
+### Assessments
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/assessment/phq9` | PHQ-9 depression screening |
+| GET/POST | `/api/assessment/gad7` | GAD-7 anxiety screening |
+| GET | `/api/assessment/history` | All past assessment results |
+
+### Dashboard & Analytics
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/dashboard/stats` | Summary stats |
+| GET | `/api/analytics/user-stats` | Detailed user statistics |
+| GET | `/api/analytics/mood-trend` | Mood trend over time |
+| GET | `/api/predictive/risk-score` | Predictive risk assessment |
+| GET | `/api/predictive/mood-forecast` | Mood forecast |
+
+### Wellness
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | GET | `/api/wellness/breathing` | Breathing exercises |
 | GET | `/api/wellness/meditation` | Meditation sessions |
+| GET | `/api/wellness/grounding` | Grounding techniques |
+| GET | `/api/wellness/journal` | Journal prompts |
+
+### System
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | GET | `/api/health` | Health check |
-| GET | `/api/docs/` | Swagger API documentation |
+| GET | `/api/docs/` | Swagger / OpenAPI documentation |
+
+---
+
+## Safety & Crisis Detection
+
+Every message passes through the crisis detection engine **before** the LLM generates a response.
+
+| Severity | Score | Trigger |
+|---|---|---|
+| NORMAL | 0 | No risk indicators |
+| MODERATE | 5 | 1–2 warning keywords detected |
+| HIGH | 7 | 3+ warning keywords detected |
+| CRITICAL | 10 | Any crisis-level keyword detected, or PHQ-9 ≥ 20 |
+
+When CRITICAL or HIGH severity is detected, the interface immediately surfaces emergency crisis resources including international helplines.
+
+---
+
+## Clinical Assessments
+
+### PHQ-9 (Patient Health Questionnaire)
+9 questions · Score range 0–27
+
+| Score | Severity |
+|---|---|
+| 0–4 | Minimal |
+| 5–9 | Mild |
+| 10–14 | Moderate |
+| 15–19 | Moderately Severe |
+| 20–27 | Severe → auto-triggers CRITICAL crisis flag |
+
+### GAD-7 (Generalised Anxiety Disorder scale)
+7 questions · Score range 0–21
+
+| Score | Severity |
+|---|---|
+| 0–4 | Minimal |
+| 5–9 | Mild |
+| 10–14 | Moderate |
+| 15–21 | Severe |
 
 ---
 
 ## Disclaimer
 
-> ⚠️ **Serene is not a medical device and is not a replacement for professional mental health care.** It is an academic project developed for educational purposes. If you are in crisis, please contact a mental health professional or call a crisis helpline (e.g. 988 in the US).
+> ⚠️ **Serene is not a medical device and is not a substitute for professional mental health care.** It is an academic project developed for educational purposes only. If you or someone you know is in crisis, please contact a qualified mental health professional or a crisis helpline:
 
 ---
 
-*Developed by Zaid Ahmad — BSc Computer Science with Artificial Intelligence, 2026*
